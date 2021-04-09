@@ -14,37 +14,167 @@ const unsigned int BLOCK_SZ = 4096;
 using namespace std;
 using namespace hsql;
 
-// forward declaration
+// forward declaration headers
 string operatorExpressionToString(const Expr *expr);
+string expressionToString(const Expr* expression);
+string exeSelect(const SelectStatement *statement);
+string exeCreate(const CreateStatement *statement);
+string execute(const SQLStatement *statement);
 
-string operatorExprToString(const Expr* opExpresion) {
-    if (opExpresion == NULL) {
+string columnDefToString(const ColumnDefinition* col) {
+    string retString(col->name);
+    switch (col->type) {
+        case ColumnDefinition::DOUBLE:
+            retString += " DOUBLE";
+            break;
+        case ColumnDefinition::INT:
+            retString += " INT";
+            break;
+        case ColumnDefinition::TEXT:
+            retString += " TEXT";
+            break;
+        default:
+            retString += " UNSUPPORTED TYPE";
+            break;
+    }
+    return retString;
+}
+
+string tableRefExprToString(const TableRef* table) {
+    string retString;
+    switch (table->type) {
+        case kTableSelect:
+            cout << "- sqlshell: Nested SELECT in JOIN DETECTED" << endl;
+            // Inner Select Statement
+            retString += execute(table->select);
+            break;
+        case kTableName:
+            retString += table->name;
+            if (table->alias != NULL) {
+                retString += string(" AS ") + table->alias;
+            }
+            break;
+        case kTableJoin:
+            // Traverse down the left side of the table join AST
+            retString += tableRefExprToString(table->join->left);
+            switch (table->join->type) {
+                case kJoinInner:
+                    retString += " JOIN ";
+                    break;
+                case kJoinLeft:
+                    retString += " LEFT JOIN ";
+                    break;
+                    /*
+                    case kJoinCross:
+                        retString += " UNSUPPORTED JOIN";
+                        break;
+                    case kJoinOuter:
+                        retString += " UNSUPPORTED JOIN";
+                        break;
+                    case kJoinLeftOuter:
+                        retString += " UNSUPPORTED JOIN";
+                        break;
+                    case kJoinRightOuter:
+                        retString += " UNSUPPORTED JOIN";
+                        break;
+                    */
+                default:
+                    retString += " UNSUPPORTED JOIN";
+                    break;
+
+            }
+            retString += tableRefExprToString(table->join->right);
+            // If there is a JOIN condition
+            if (table->join->condition != NULL) {
+                retString += " ON " + expressionToString(table->join->condition);
+            }
+            break;
+        default:
+            retString += "UNSUPPORTED JOIN";
+            break;
+    }
+    return retString;
+}
+
+/*
+ * Utilizes the binary tree structure of an expr type to print
+ * the operators and operands to console. It first addresses unary
+ * operators then traverses down the left hands side of the expression
+ * AST (The center most operator as the root) and then the right side.
+ * note that additional logic from expressionToString is used in this
+ * traversal.
+ */
+string operatorExprToString(const Expr* opExpression) {
+    if (opExpression == NULL) {
         return "null";
     }
+    string retString;
 
-    return "TODO";
+    // If expression is a unary NOT operator, add "NOT" to the
+    // to the return string
+    if(opExpression->opType == Expr::NOT) {
+        cout << "- sqlshell: NOT DETECTED" << endl;
+        retString += "NOT ";
+    }
+
+    // Call expressionToString() on the left hand of the
+    // expression linked to by member var "expr"
+    retString += expressionToString(opExpression->expr) + " ";
+
+    switch (opExpression->opType) {
+        case Expr::SIMPLE_OP:
+            cout << "- sqlshell: Simple Op DETECTED" << endl;
+            retString += opExpression->opChar;
+            break;
+        case Expr::AND:
+            cout << "- sqlshell: AND DETECTED" << endl;
+            retString += "AND";
+            break;
+        case Expr::OR:
+            cout << "- sqlshell: OR DETECTED" << endl;
+            retString += "OR";
+            break;
+        default:
+            break; // To avoid redundant "NOT" there is not "NOT" case
+    }
+
+    if (opExpression->expr2 != NULL) {
+        retString += " " + expressionToString(opExpression->expr2);
+    }
+    return retString;
 }
 
 string expressionToString(const Expr *expression) {
     string retString;
     switch (expression->type) {
+        // Note this case does not break!
+        case kExprColumnRef:
+            cout << "- sqlshell: Column Ref DETECTED" << endl;
+            if(expression->table != NULL) {
+                retString += string(expression->table) + ".";
+            }
+        case kExprLiteralString:
+            cout << "- sqlshell: String DETECTED" << endl;
+            retString += expression->name;
+            break;
         case kExprStar:
-            cout << "* DETECTED" << endl;
+            cout << "- sqlshell: * DETECTED" << endl;
             retString += "*";
             break;
         case kExprLiteralInt:
+            cout << "- sqlshell: Int DETECTED" << endl;
             retString += to_string(expression->ival);
             break;
         case kExprLiteralFloat:
+            cout << "- sqlshell: Float DETECTED" << endl;
             retString += to_string(expression->fval);
             break;
-        case kExprLiteralString:
-            retString += expression->name;
-            break;
         case kExprOperator:
+            cout << "- sqlshell: Operator DETECTED" << endl;
             retString += operatorExprToString(expression);
             break;
         default:
+            cout << "- sqlshell: expression not recognized!" << endl;
             retString += "EXPRESSION NOT RECOGNIZED";
             break;
     }
@@ -53,30 +183,49 @@ string expressionToString(const Expr *expression) {
 
 
 string exeSelect(const SelectStatement *statement) {
-    string retString("SELECT");
+    string retString("SELECT ");
     bool notFirstExpr = false;
-    cout << "IN exe SELECT" << endl;
+    cout << "- sqlshell: in SELECT exe" << endl;
     for (Expr *expr : *statement->selectList) {
-        cout << "expr loop from select list" << endl;
+        cout << "- sqlshell: in expr loop" << endl;
         if(notFirstExpr) {
             retString += ", ";
         }
         retString += expressionToString(expr);
         notFirstExpr = true;
     }
-    //ret += " FROM " + tableRefInfoToString(statement->fromTable);
+    retString += " FROM " + tableRefExprToString(statement->fromTable);
+    if (statement->whereClause != NULL) {
+        retString += " WHERE " + expressionToString(statement->whereClause);
+    }
     return retString;
 }
 
-string exeCreate(const CreateStatement *statement) {
-    return "TODO";
+string exeCreate(const CreateStatement* statement) {
+    bool notFirstExpr = false;
+    string retString("CREATE ");
+    retString += string(statement->tableName) + " (";
+    for (ColumnDefinition* column : *statement->columns) {
+        if(notFirstExpr) {
+            retString += ", ";
+        }
+        retString += columnDefToString(column);
+        notFirstExpr = true;
+    }
+    retString += ")";
+    return retString;
+}
+
+string exeInsert(const InsertStatement* statement) {
+    string retString("INSERT NOT FULLY SUPPORTED");
+    return retString;
 }
 
 string execute(const SQLStatement *statement) {
     string retString;
     switch (statement->type()) {
         case kStmtSelect:{
-            cout << "SELECT DETECTED" << endl;
+            cout << "- sqlshell: SELECT DETECTED" << endl;
             const SelectStatement* selectStmt = (const SelectStatement *) statement;
             retString = exeSelect(selectStmt);
             return retString;
