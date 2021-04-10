@@ -21,9 +21,15 @@ string exeSelect(const SelectStatement *statement);
 string exeCreate(const CreateStatement *statement);
 string execute(const SQLStatement *statement);
 
-string columnDefToString(const ColumnDefinition* col) {
-    string retString(col->name);
-    switch (col->type) {
+/**
+ * Translates a ColumnDefinition type e.g "a INT" to a string representation
+ * of the column name and data type.
+ * @param column definition to convert to string
+ * @return the string representation of the column definition in SQL format
+ */
+string columnDefToString(const ColumnDefinition* column) {
+    string retString(column->name);
+    switch (column->type) {
         case ColumnDefinition::DOUBLE:
             retString += " DOUBLE";
             break;
@@ -40,6 +46,15 @@ string columnDefToString(const ColumnDefinition* col) {
     return retString;
 }
 
+/**
+ * Translates a table reference hyrise AST into it's string representation in
+ * SQL format. This method starts at the AST root and makes recursive calls down
+ * the left and right sides of the statement. Note that TableRef of kTableJoin
+ * type have a subtype.
+ * @param table : a TableRef pointer, to a portion of the statement such as
+ *                foo JOIN fee ON c .. OR .. foo JOIN SELECT a, b FROM fie ON d
+ * @return : The string representation of the TableRef hyrise AST in SQL form.
+ */
 string tableRefExprToString(const TableRef* table) {
     string retString;
     switch (table->type) {
@@ -49,12 +64,14 @@ string tableRefExprToString(const TableRef* table) {
             retString += execute(table->select);
             break;
         case kTableName:
+            cout << "- sqlshell: Table name DETECTED" << endl;
             retString += table->name;
             if (table->alias != NULL) {
                 retString += string(" AS ") + table->alias;
             }
             break;
         case kTableJoin:
+            cout << "- sqlshell: JOIN DETECTED" << endl;
             // Traverse down the left side of the table join AST
             retString += tableRefExprToString(table->join->left);
             switch (table->join->type) {
@@ -64,20 +81,6 @@ string tableRefExprToString(const TableRef* table) {
                 case kJoinLeft:
                     retString += " LEFT JOIN ";
                     break;
-                    /*
-                    case kJoinCross:
-                        retString += " UNSUPPORTED JOIN";
-                        break;
-                    case kJoinOuter:
-                        retString += " UNSUPPORTED JOIN";
-                        break;
-                    case kJoinLeftOuter:
-                        retString += " UNSUPPORTED JOIN";
-                        break;
-                    case kJoinRightOuter:
-                        retString += " UNSUPPORTED JOIN";
-                        break;
-                    */
                 default:
                     retString += " UNSUPPORTED JOIN";
                     break;
@@ -86,23 +89,33 @@ string tableRefExprToString(const TableRef* table) {
             retString += tableRefExprToString(table->join->right);
             // If there is a JOIN condition
             if (table->join->condition != NULL) {
+                cout << "- sqlshell: ON DETECTED" << endl;
                 retString += " ON " + expressionToString(table->join->condition);
             }
             break;
-        default:
-            retString += "UNSUPPORTED JOIN";
+        case kTableCrossProduct:
+            bool notFirstExpr = false;
+            for (TableRef* tableRef : *table->list) {
+                if(notFirstExpr) {
+                    retString += ", ";
+                }
+                retString += tableRefExprToString(tableRef);
+                notFirstExpr = true;
+            }
             break;
     }
     return retString;
 }
 
-/*
- * Utilizes the binary tree structure of an expr type to print
+/**
+ * Utilizes the binary tree structure of an expr type (hyrise AST) to print
  * the operators and operands to console. It first addresses unary
  * operators then traverses down the left hands side of the expression
  * AST (The center most operator as the root) and then the right side.
  * note that additional logic from expressionToString is used in this
  * traversal.
+ * @param opExpression : operator Expr hyrise AST
+ * @return : unparsed operator expresion in SQL form as a string
  */
 string operatorExprToString(const Expr* opExpression) {
     if (opExpression == NULL) {
@@ -117,7 +130,7 @@ string operatorExprToString(const Expr* opExpression) {
         retString += "NOT ";
     }
 
-    // Call expressionToString() on the left hand of the
+    // Call expressionToString() on the left hand side of the
     // expression linked to by member var "expr"
     retString += expressionToString(opExpression->expr) + " ";
 
@@ -138,13 +151,26 @@ string operatorExprToString(const Expr* opExpression) {
             break; // To avoid redundant "NOT" there is not "NOT" case
     }
 
+    // Call expressionToString() on the right hand side of the
+    // expression linked to by member var "expr2"
     if (opExpression->expr2 != NULL) {
         retString += " " + expressionToString(opExpression->expr2);
     }
     return retString;
 }
 
-string expressionToString(const Expr *expression) {
+/**
+ * un-parses the a hyrise AST of a SQL expression and constructs its string
+ * representation in SQL format. Note the call to operatorExprToString where a
+ * subtree of the AST is unparsed and returned. Also note that when
+ * the Expr* is of KExprColumnRef type the case will not break, allowing for the
+ * addition of the left and then (in the subsequent case) the right side of
+ * a table.row reference.
+ *
+ * @param expression : a hyrise AST of a SQL expression to be unparsed.
+ * @return : the string representation of the hyrise AST in SQL form.
+ */
+string expressionToString(const Expr* expression) {
     string retString;
     switch (expression->type) {
         // Note this case does not break!
@@ -181,13 +207,19 @@ string expressionToString(const Expr *expression) {
     return retString;
 }
 
-
+/**
+ * Executes a select statement hyrise AST. (but for now, returns unparsed AST in
+ * string SQL statement form). Note the calls to expressionToString for the
+ * select statement components and the condition "WHERE" components.
+ * @param statement
+ * @return
+ */
 string exeSelect(const SelectStatement *statement) {
+    cout << "- sqlshell: EXECUTING SELECT" << endl;
     string retString("SELECT ");
     bool notFirstExpr = false;
-    cout << "- sqlshell: in SELECT exe" << endl;
     for (Expr *expr : *statement->selectList) {
-        cout << "- sqlshell: in expr loop" << endl;
+        cout << "- sqlshell: in expr loop (exSELECT)" << endl;
         if(notFirstExpr) {
             retString += ", ";
         }
@@ -196,11 +228,19 @@ string exeSelect(const SelectStatement *statement) {
     }
     retString += " FROM " + tableRefExprToString(statement->fromTable);
     if (statement->whereClause != NULL) {
+        cout << "- sqlshell: WHERE DETECTED" << endl;
         retString += " WHERE " + expressionToString(statement->whereClause);
     }
     return retString;
 }
 
+/**
+ * Executes a create statement hyrise AST. (but for now, returns unparsed AST in
+ * string SQL statement form). Note the call to columnDefToString for every
+ * member of the columns list (ColumnDefinition type).
+ * @param statement : a hyrise AST create statement to be unparsed.
+ * @return : the string representation of the create statement in SQL form.
+ */
 string exeCreate(const CreateStatement* statement) {
     bool notFirstExpr = false;
     string retString("CREATE ");
@@ -216,42 +256,55 @@ string exeCreate(const CreateStatement* statement) {
     return retString;
 }
 
+/**
+ * Executes a insert statement hyrise AST. (but for now, NOT IMPLEMENTED).
+ * @param statement : a hyrise AST insert statement to be unparsed.
+ * @return : the string representation of the insert statement in SQL form.
+ */
 string exeInsert(const InsertStatement* statement) {
     string retString("INSERT NOT FULLY SUPPORTED");
     return retString;
 }
 
+/**
+ * Start of SQL hyrise AST unparsing, detects the SQL statement type and calls
+ * subsequent logic specific to that statement type.
+ * @param statement : the hyrise AST (SQLStatement) to be unparsed
+ * @return : the SQL statement representation in a string
+ */
 string execute(const SQLStatement *statement) {
-    string retString;
+    string retString = "\nSQL STATEMENT:\n==============\n";
+
     switch (statement->type()) {
         case kStmtSelect:{
             cout << "- sqlshell: SELECT DETECTED" << endl;
             const SelectStatement* selectStmt = (const SelectStatement *) statement;
-            retString = exeSelect(selectStmt);
-            return retString;
+            retString += exeSelect(selectStmt);
+            return retString + "\n";
         }
         case kStmtCreate:{
             const CreateStatement* createStmt = (const CreateStatement *) statement;
-            retString = exeCreate(createStmt);
-            return retString;
+            retString += exeCreate(createStmt);
+            return retString + "\n";
         }
         case kStmtInsert:
-            return "INSERT";
+            return retString += "INSERT\n";
         case kStmtDrop:
-            return "DROP";
+            return retString += "DROP\n";
         default:
-            return "Not Implemented";
+            return retString += "Not Implemented\n";
     }
 }
 
 int main(int argc, char* argv[]) {
+    cout << "\n||| SQL SHELL ||| (Milestone 1) " << endl;
     if (argc <= 1) {
         fprintf(stderr, "Usage: ./sqlshell cpsc5300/data\n");
         return -1;
     }
     string envdir = string(argv[1]);
-    cout << "\n envdir: " << envdir << endl;
-
+    cout << "\n in working environment: " << envdir << "\n" << endl;
+    cout << "\n Enter SQL statements OR 'quit' to quit" << "\n" << endl;
     DbEnv env(0U);
     env.set_message_stream(&std::cout);
     env.set_error_stream(&std::cerr);
@@ -267,38 +320,29 @@ int main(int argc, char* argv[]) {
     while(query != "quit") {
         cout << "SQL > ";
         getline(cin, query);
-        cout << query << endl;
+        cout << "\ninput query: " << query << endl;
 
-        // execute
-        SQLParserResult* result = SQLParser::parseSQLString(query);
-        cout << "Parse result size: " << result->size() << endl;
-        if (result->isValid()) {
-            for(uint i = 0; i < result->size(); i++) {
-                cout << execute(result->getStatement(i)) << endl;
-                cout << "HERE!" << endl;
+        if (query != "quit") {
+            // execute
+            SQLParserResult* result = SQLParser::parseSQLString(query);
+            cout << "Parse result size: " << result->size() << endl;
+            if (result->isValid()) {
+                for(uint i = 0; i < result->size(); i++) {
+                    cout << execute(result->getStatement(i)) << endl;
+                }
+            } else {
+                fprintf(stderr, "Given string is not a valid SQL query.\n");
+                fprintf(stderr, "%s (L%d:%d)\n",
+                        result->errorMsg(),
+                        result->errorLine(),
+                        result->errorColumn());
             }
-            cout << "HERE! 2" << endl;
-        } else {
-            fprintf(stderr, "Given string is not a valid SQL query.\n");
-            fprintf(stderr, "%s (L%d:%d)\n",
-                    result->errorMsg(),
-                    result->errorLine(),
-                    result->errorColumn());
         }
     }
 
-    char block[BLOCK_SZ];
-    Dbt data(block, sizeof(block));
-    int block_number;
-    Dbt key(&block_number, sizeof(block_number));
-    block_number = 1;
-    strcpy(block, "hello!");
-    db.put(NULL, &key, &data, 0);  // write block #1 to the database
-
-    Dbt rdata;
-    db.get(NULL, &key, &rdata, 0); // read block #1 from the database
-    cout << "Read (block #" << block_number << "): '" << (char *)rdata.get_data() << "'";
-    cout << " (expect 'hello!')" << std::endl;
+    // To be used Later
+    cout << "- sqlshell: END OF MAIN " << endl;
+    cout << "------------------------" << endl;
 
     return EXIT_SUCCESS;
 }
