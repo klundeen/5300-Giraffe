@@ -1,5 +1,6 @@
 file(REMOVE_RECURSE
   "CMakeFiles/5300-Giraffe.dir/sql5300.cpp.o"
+  "CMakeFiles/5300-Giraffe.dir/heap_storage.cpp.o"
   "5300-Giraffe.pdb"
   "5300-Giraffe"
 )

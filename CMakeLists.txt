@@ -3,7 +3,7 @@ project(5300-Giraffe)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Werror" )
 set(SOURCE_FILES
-        sql5300.cpp)
+        sql5300.cpp heap_storage.cpp)
 add_executable(5300-Giraffe ${SOURCE_FILES})
 include_directories(/usr/local/db6/include)
 include_directories(~/sql-parser/src)

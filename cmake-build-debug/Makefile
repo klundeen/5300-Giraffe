@@ -123,6 +123,33 @@ depend:
 	$(MAKE) -f CMakeFiles/5300-Giraffe.dir/build.make CMakeFiles/5300-Giraffe.dir/build
 .PHONY : 5300-Giraffe/fast
 
+heap_storage.o: heap_storage.cpp.o
+
+.PHONY : heap_storage.o
+
+# target to build an object file
+heap_storage.cpp.o:
+	$(MAKE) -f CMakeFiles/5300-Giraffe.dir/build.make CMakeFiles/5300-Giraffe.dir/heap_storage.cpp.o
+.PHONY : heap_storage.cpp.o
+
+heap_storage.i: heap_storage.cpp.i
+
+.PHONY : heap_storage.i
+
+# target to preprocess a source file
+heap_storage.cpp.i:
+	$(MAKE) -f CMakeFiles/5300-Giraffe.dir/build.make CMakeFiles/5300-Giraffe.dir/heap_storage.cpp.i
+.PHONY : heap_storage.cpp.i
+
+heap_storage.s: heap_storage.cpp.s
+
+.PHONY : heap_storage.s
+
+# target to generate assembly for a file
+heap_storage.cpp.s:
+	$(MAKE) -f CMakeFiles/5300-Giraffe.dir/build.make CMakeFiles/5300-Giraffe.dir/heap_storage.cpp.s
+.PHONY : heap_storage.cpp.s
+
 sql5300.o: sql5300.cpp.o
 
 .PHONY : sql5300.o
@@ -159,6 +186,9 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... 5300-Giraffe"
 	@echo "... edit_cache"
+	@echo "... heap_storage.o"
+	@echo "... heap_storage.i"
+	@echo "... heap_storage.s"
 	@echo "... sql5300.o"
 	@echo "... sql5300.i"
 	@echo "... sql5300.s"

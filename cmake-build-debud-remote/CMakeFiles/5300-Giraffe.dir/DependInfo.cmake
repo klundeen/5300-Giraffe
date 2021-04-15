@@ -4,6 +4,7 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_CXX
+  "/home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/heap_storage.cpp" "/home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/cmake-build-debud-remote/CMakeFiles/5300-Giraffe.dir/heap_storage.cpp.o"
   "/home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/sql5300.cpp" "/home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/cmake-build-debud-remote/CMakeFiles/5300-Giraffe.dir/sql5300.cpp.o"
   )
 set(CMAKE_CXX_COMPILER_ID "GNU")

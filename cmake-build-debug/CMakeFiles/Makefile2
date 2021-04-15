@@ -66,7 +66,7 @@ CMAKE_BINARY_DIR = /home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/cmake-build-
 CMakeFiles/5300-Giraffe.dir/all:
 	$(MAKE) -f CMakeFiles/5300-Giraffe.dir/build.make CMakeFiles/5300-Giraffe.dir/depend
 	$(MAKE) -f CMakeFiles/5300-Giraffe.dir/build.make CMakeFiles/5300-Giraffe.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/cmake-build-debug/CMakeFiles --progress-num=1,2 "Built target 5300-Giraffe"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/cmake-build-debug/CMakeFiles --progress-num=1,2,3 "Built target 5300-Giraffe"
 .PHONY : CMakeFiles/5300-Giraffe.dir/all
 
 # Include target in all.
@@ -76,7 +76,7 @@ all: CMakeFiles/5300-Giraffe.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/5300-Giraffe.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/cmake-build-debug/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/cmake-build-debug/CMakeFiles 3
 	$(MAKE) -f CMakeFiles/Makefile2 CMakeFiles/5300-Giraffe.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/cmake-build-debug/CMakeFiles 0
 .PHONY : CMakeFiles/5300-Giraffe.dir/rule

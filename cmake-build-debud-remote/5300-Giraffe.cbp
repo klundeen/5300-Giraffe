@@ -84,6 +84,9 @@
 				</MakeCommands>
 			</Target>
 		</Build>
+		<Unit filename="/home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/heap_storage.cpp">
+			<Option target="5300-Giraffe"/>
+		</Unit>
 		<Unit filename="/home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/sql5300.cpp">
 			<Option target="5300-Giraffe"/>
 		</Unit>
