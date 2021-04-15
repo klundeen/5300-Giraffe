@@ -1,0 +1,1 @@
+/usr/bin/c++   -pedantic -Wall -Werror -g   CMakeFiles/5300-Giraffe.dir/sql5300.cpp.o  -o 5300-Giraffe  -L/usr/local/db6/lib -Wl,-rpath,/usr/local/db6/lib /usr/local/db6/lib/libdb_cxx.so -lsqlparser 
