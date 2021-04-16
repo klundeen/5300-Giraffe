@@ -10,6 +10,7 @@
 #pragma once
 
 #include "db_cxx.h"
+#include "storage_engine.h"
 #include "../../Downloads/5300-Instructor-Milestone2h/5300-Instructor-Milestone2h/storage_engine.h"
 
 /**

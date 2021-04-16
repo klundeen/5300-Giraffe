@@ -272,8 +272,8 @@ public:
 class DbRelation {
 public:
     // ctor/dtor
-    DbRelation(Identifier table_name, ColumnNames column_names, ColumnAttributes column_attributes) : table_name(
-            table_name), column_names(column_names), column_attributes(column_attributes) {}
+    DbRelation(Identifier table_name, ColumnNames column_names, ColumnAttributes column_attributes) : table_name{
+            table_name}, column_names{column_names}, column_attributes{column_attributes} {}
 
     virtual ~DbRelation() {}
 
