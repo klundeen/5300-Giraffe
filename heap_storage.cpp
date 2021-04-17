@@ -1,7 +1,16 @@
 #include "heap_storage.h"
 #include "storage_engine.h"
+#include <map>
+#include <algorithm>
+#include <iostream>
+#include <cstring>
+#include <cstdint>
+#include "utf8.h"
 
 using namespace std;
+using std::map;
+
+
 
 int DB_BLOCK_SIZE = 4096;
 
@@ -115,18 +124,120 @@ ValueDict* HeapTable::project(Handle handle) {
     return row;
 }
 
-ValueDict* HeapTable::project(Handle handle, const ColumnNames *column_names) {
+ValueDict* HeapTable::project(Handle handle, const ColumnNames* column_names) {
     ValueDict* row = this->project(handle);
+    auto* retRow = new ValueDict();
     // STOPPED HERE!
+    for (const auto& k : *column_names){
+        map<Identifier, Value> map = *row;
+        Value v = map[k];
+        retRow->insert(pair<Identifier,Value>(k, v));
+    }
+    return retRow;
 }
 
+ValueDict* HeapTable::validate(const ValueDict *row) {
+    ValueDict localRow = *row;
+    ValueDict* fullRow = new ValueDict();
+    Value v;
+    for (Identifier column_name : this->column_names) {
+        if (localRow.find(column_name) == localRow.end()) {
+            throw new DbRelationError("don't know how to handle NULLs, defaults, etc. yet");
+        } else {
+            v = localRow[column_name];
+        }
+        fullRow->insert(pair<Identifier , Value>(column_name, v));
+    }
+    return fullRow;
+}
+
+Handle HeapTable::append(const ValueDict *row) {
+    Dbt* data = marshal(row);
+    DbBlock* block = this->file.get(this->file.get_last_blockid());
+    RecordID recordId;
+    try {
+        recordId = block->add(data);
+    } catch (DbRelationError e) {
+        block = this->file.get_new();
+        recordId = block->add(data);
+    }
+    this->file.put(block);
+    Handle toAppend;
+    toAppend.first = block->get_block_id();
+    toAppend.second = recordId;
+    return toAppend;
+}
 
 
 void HeapTable::drop() {
     delete this->file;
 }
 
+// return the bits to go into the file
+// caller responsible for freeing the returned Dbt and its enclosed ret->get_data().
+Dbt* HeapTable::marshal(const ValueDict* row) {
+    char *bytes = new char[DbBlock::BLOCK_SZ]; // more than we need (we insist that one row fits into DbBlock::BLOCK_SZ)
+    uint offset = 0;
+    uint col_num = 0;
+    for (auto const& column_name: this->column_names) {
+        ColumnAttribute ca = this->column_attributes[col_num++];
+        ValueDict::const_iterator column = row->find(column_name);
+        Value value = column->second;
+        if (ca.get_data_type() == ColumnAttribute::DataType::INT) {
+            *(int32_t*) (bytes + offset) = value.n;
+            offset += sizeof(int32_t);
+        } else if (ca.get_data_type() == ColumnAttribute::DataType::TEXT) {
+            uint size = value.s.length();
+            *(u_int16_t *) (bytes + offset) = size;
+            offset += sizeof(u_int16_t);
+            memcpy(bytes+offset, value.s.c_str(), size); // assume ascii for now
+            offset += size;
+        } else {
+            throw DbRelationError("Only know how to marshal INT and TEXT");
+        }
+    }
+    char *right_size_bytes = new char[offset];
+    memcpy(right_size_bytes, bytes, offset);
+    delete[] bytes;
+    Dbt *data = new Dbt(right_size_bytes, offset);
+    return data;
+}
 
+ValueDict* HeapTable::unmarshal(Dbt* data) {
+    ValueDict* retRow = new ValueDict();
+    uint offset = 0;
+    uint col_num = 0;
+    for (auto const& column_name: this->column_names) {
+        ColumnAttribute ca = this->column_attributes[col_num++];
+        string dataString = *(data->data);
+        if (ca.get_data_type() == ColumnAttribute::DataType::INT) {
+            string subDataString = dataString.substr(offset, offset + sizeof(int32_t)); // from offset => offset + sizeof(int32_t);
+            const void* subDataPointer = &subDataString;
+            cout << subDataString;
+            int v;
+            memcpy(&v, subDataPointer, sizeof(int32_t));
+            Value* val = new Value(v);
+            retRow->insert(pair<Identifier , Value>(column_name, *val));
+        } else if (ca.get_data_type() == ColumnAttribute::DataType::TEXT) {
+            string sizeDataString = dataString.substr(offset, offset + sizeof(u_int16_t)); // Make Constant for 2
+            const void* sizeDataPointer = &sizeDataString;
+            int size;
+            memcpy(&size, sizeDataPointer, sizeof(u_int16_t));
+            offset += 2;
+            string subDataString = dataString.substr(offset, offset + size);
+            const void* subDataPointer = &subDataString;
+            cout << subDataString;
+            char* v;
+            memcpy(&v, subDataPointer, size);
+            offset += size;
+            Value* val = new Value(v);
+            retRow->insert(pair<Identifier , Value>(column_name, *val));
+        } else {
+            throw DbRelationError("Only know how to marshal INT and TEXT");
+        }
+    }
+    return retRow;
+}
 
 bool test_heap_storage() {return true;}
 
