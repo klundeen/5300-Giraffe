@@ -10,7 +10,7 @@
 using namespace std;
 using std::map;
 
-
+_DB_ENV = '/home/st/bruizdesomocurcio/cpsc5300/data'
 
 int DB_BLOCK_SIZE = 4096;
 
@@ -53,6 +53,92 @@ void SlottedPage::put_header(RecordID id, u_int16_t size, u_int16_t loc) {
 u_int16_t SlottedPage::get_n(u_int16_t offset) {
     return int.from_bytes(this.block[offset:offset + 2], this.byteorder=self.BYTE_ORDER) //python code
 }
+
+
+
+HeapFile::HeapFile(std::string name) : DbFile(name),
+                                  dbfilename(""), last(0), closed(true), db(_DB_ENV, 0) {
+//need to add anything here? seems to be completed from header
+}
+
+HeapFile::~HeapFile(){
+	this->close();
+	delete this;
+	//not sure if this is the right way to delete itself
+}
+
+void HeapFile::create(void){
+	this->db_open(); //doesn't pass flags like python code, header doesnt accept them
+	SlottedPage* block = this->get_new();
+	this->put(block);
+}
+
+void HeapFile::open(void){
+	this->db_open();
+	// HeapFile doesn't have a block_size variable, python line not included
+	//this->block_size = this->stat['re_len'];
+
+}
+
+void HeapFile::close(void){
+		this->db.close();
+		this->closed = true;
+}
+
+// Allocate a new block for the database file.
+// Returns the new empty DbBlock that is managing the records in this block and its block id.
+SlottedPage* HeapFile::get_new(void) {
+    char block[DbBlock::BLOCK_SZ];
+    std::memset(block, 0, sizeof(block));
+    Dbt data(block, sizeof(block));
+
+    int block_id = ++this->last;
+    Dbt key(&block_id, sizeof(block_id));
+
+    // write out an empty block and read it back in so Berkeley DB is managing the memory
+    SlottedPage* page = new SlottedPage(data, this->last, true);
+    this->db.put(nullptr, &key, &data, 0); // write it out with initialization applied
+    this->db.get(nullptr, &key, &data, 0);
+    return page;
+}
+
+SlottedPage* HeapFile::get(BlockID block_id){
+	return SlottedPage(this->db.get(block_id), block_id);
+}
+
+
+void HeapFile::put(DbBlock *block){
+	this->db.put(block->block_id, bytes(block->block));//not sure if bytes is a function
+}
+
+BlockIDs* HeapFile::block_ids(){
+	BlockIDs* blockIDs = new BlockIDs();
+	for (int i = 1; i <= this.last; i++){
+		blockIDs.add(i);
+	}
+	return blockIDs;
+}
+
+u_int32_t HeapFile::get_last_block_id() { 
+	return last; 
+}
+
+
+//confused about this one
+void HeapFile::db_open(uint flags = 0){
+	if (!this->closed){
+		return;
+	}
+	this->db = new DbEnv();
+	this->db.set_re_len(BLOCK_SZ); //does this function exist?
+	this->dbfilename = _DB_ENV + this->name + '.db'; //what is this->name?
+	//dbtype = DB_RECNO;// what type is this?
+	this->db.open(this->dbfilename, nullptr, DB_RECNO, flags); 
+	this->stat = this.db.stat(DB_FAST_STAT);//what is this->stat??
+this->last = this->stat['ndata'];
+	this->closed = False;
+}
+
 
 HeapTable::HeapTable(Identifier table_name, ColumnNames column_names,
                                ColumnAttributes column_attributes) : DbRelation(table_name, column_names, column_attributes) {
