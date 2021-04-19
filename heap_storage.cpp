@@ -190,7 +190,12 @@ SlottedPage* HeapFile::get_new(void) {
 }
 
 SlottedPage* HeapFile::get(BlockID block_id){
-	return SlottedPage(this->db.get(block_id), block_id);
+	Dbt key(&block_id, sizeof(block_id));
+    	Dbt data;
+    	this->db.get(nullptr, &key, &data, 0);
+	return new SlottedPage(data, block_id, false);
+	//return SlottedPage(this->db.get(block_id), block_id);
+	
 }
 
 
@@ -218,11 +223,20 @@ void HeapFile::db_open(uint flags = 0){
 	}
 	this->db = new DbEnv();
 	this->db.set_re_len(BLOCK_SZ); //does this function exist?
-	this->dbfilename = _DB_ENV + this->name + '.db'; //what is this->name?
+	//this->dbfilename = _DB_ENV + this->name + '.db'; //what is this->name?
+	this->dbfilename = this->name + ".db";
 	//dbtype = DB_RECNO;// what type is this?
-	this->db.open(this->dbfilename, nullptr, DB_RECNO, flags); 
-	this->stat = this.db.stat(DB_FAST_STAT);//what is this->stat??
-this->last = this->stat['ndata'];
+	//this->db.open(this->dbfilename, nullptr, DB_RECNO, flags); 
+	this->db.open(nullptr, this->dbfilename.c_str(), nullptr, DB_RECNO, flags, 0644);
+	//this->stat = this.db.stat(DB_FAST_STAT);//what is this->stat??
+	if (flags == 0) {
+        DB_BTREE_STAT stat;
+        this->db.stat(nullptr, &stat, DB_FAST_STAT);
+        this->last = stat.bt_ndata;
+    } else {
+        this->last = 0;
+    }
+	this->last = this->stat['ndata'];
 	this->closed = False;
 }
 
