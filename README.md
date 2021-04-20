@@ -6,7 +6,7 @@
 ## Milestone 2 Status: Incomplete
 Compiles/builds but doesn't run test_heap_storage() correctly
 
-## Video Hand off linke 
+## Video Hand-off linke 
 https://youtu.be/tiNsdaldAEU
 
 ### Errors
