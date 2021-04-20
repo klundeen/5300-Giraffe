@@ -9,8 +9,7 @@
 using namespace std;
 using std::map;
 
-int DB_BLOCK_SIZE = 4096;
-
+string DIR = "~/cpsc5300/data/";
 
 SlottedPage::SlottedPage(Dbt &block, BlockID block_id, bool is_new) : DbBlock(block, block_id, is_new) {
     if (is_new) {
@@ -143,32 +142,27 @@ void* SlottedPage::address(u_int16_t offset) {
 // **************
 // * HEAP FILE *
 // **************
-HeapFile::HeapFile(std::string name) : DbFile(name),
-                                  dbfilename(""), last(0), closed(true), db(_DB_ENV, 0) {
-//need to add anything here? seems to be completed from header
-}
-
-HeapFile::~HeapFile(){
-	this->close();
-	delete this;
-	//not sure if this is the right way to delete itself
-}
 
 void HeapFile::create(void){
-	this->db_open(); //doesn't pass flags like python code, header doesnt accept them
+	this->db_open(DB_CREATE); //doesn't pass flags like python code, header doesnt accept them
 	SlottedPage* block = this->get_new();
 	this->put(block);
 }
 
+void HeapFile::drop() {
+    // Not Implemented
+}
+
 void HeapFile::open(void){
-	this->db_open();
+	this->db_open(DB_CREATE);
 	// HeapFile doesn't have a block_size variable, python line not included
 	//this->block_size = this->stat['re_len'];
 
 }
 
 void HeapFile::close(void){
-		this->db.close();
+        u_int32_t i = 0;
+		this->db.close(i);
 		this->closed = true;
 }
 
@@ -190,54 +184,47 @@ SlottedPage* HeapFile::get_new(void) {
 }
 
 SlottedPage* HeapFile::get(BlockID block_id){
-	Dbt key(&block_id, sizeof(block_id));
-    	Dbt data;
-    	this->db.get(nullptr, &key, &data, 0);
-	return new SlottedPage(data, block_id, false);
-	//return SlottedPage(this->db.get(block_id), block_id);
-	
+    Dbt* key = new Dbt();
+    Dbt* data = new Dbt();
+    void* id = &block_id;
+    key->set_data(id);
+    this->db.get(NULL, key, data, 0);
+    SlottedPage* retPage = new SlottedPage(*data, block_id, false);
+	return retPage;
 }
 
 
 void HeapFile::put(DbBlock *block){
-	this->db.put(block->block_id, bytes(block->block));//not sure if bytes is a function
+    Dbt* key = new Dbt();
+    BlockID blockID = block->get_block_id();
+    key->set_data(&blockID);
+	this->db.put(NULL, key, block->get_block(), DB_APPEND);//not sure if bytes is a function
 }
 
 BlockIDs* HeapFile::block_ids(){
 	BlockIDs* blockIDs = new BlockIDs();
-	for (int i = 1; i <= this.last; i++){
-		blockIDs.add(i);
+	for (u_int32_t i = 1; i <= this->last; i++){
+		blockIDs->push_back(i);
 	}
 	return blockIDs;
 }
 
-u_int32_t HeapFile::get_last_block_id() { 
-	return last; 
-}
-
-
 //confused about this one
-void HeapFile::db_open(uint flags = 0){
+void HeapFile::db_open(uint flags){
 	if (!this->closed){
 		return;
 	}
-	this->db = new DbEnv();
-	this->db.set_re_len(BLOCK_SZ); //does this function exist?
-	//this->dbfilename = _DB_ENV + this->name + '.db'; //what is this->name?
-	this->dbfilename = this->name + ".db";
-	//dbtype = DB_RECNO;// what type is this?
-	//this->db.open(this->dbfilename, nullptr, DB_RECNO, flags); 
+	this->db.set_re_len(DbBlock::BLOCK_SZ); //does this function exist?
+	this->dbfilename = this->name + ".db"; //what is this->name?
 	this->db.open(nullptr, this->dbfilename.c_str(), nullptr, DB_RECNO, flags, 0644);
-	//this->stat = this.db.stat(DB_FAST_STAT);//what is this->stat??
-	if (flags == 0) {
+    if (flags == 0) {
         DB_BTREE_STAT stat;
         this->db.stat(nullptr, &stat, DB_FAST_STAT);
         this->last = stat.bt_ndata;
     } else {
         this->last = 0;
     }
-	this->last = this->stat['ndata'];
-	this->closed = False;
+	this->closed = false;
 }
 
 // **************
@@ -245,8 +232,8 @@ void HeapFile::db_open(uint flags = 0){
 // **************
 
 HeapTable::HeapTable(Identifier table_name, ColumnNames column_names,
-                               ColumnAttributes column_attributes) : DbRelation(table_name, column_names, column_attributes) {
-    this->file = new HeapFile(table_name);
+                               ColumnAttributes column_attributes) : DbRelation(table_name, column_names, column_attributes), file(table_name) {
+
 }
 
 void HeapTable::create() {
@@ -256,7 +243,7 @@ void HeapTable::create() {
 void HeapTable::create_if_not_exists() {
     try {
         this->open();
-    } catch (DbRelationError e) {
+    } catch (const DbRelationError &) {
         this->create();
     }
 }
@@ -272,6 +259,14 @@ void HeapTable::close() {
 Handle HeapTable::insert(const ValueDict *row) {
     this->open();
     return this->append(this->validate(row));
+}
+
+void HeapTable::update(const Handle handle, const ValueDict *new_values) {
+    // Not implemented
+}
+
+void HeapTable::del(const Handle handle) {
+    // Not Implemented
 }
 
 Handles* HeapTable::select() {
@@ -343,11 +338,11 @@ ValueDict* HeapTable::validate(const ValueDict *row) {
 
 Handle HeapTable::append(const ValueDict *row) {
     Dbt* data = marshal(row);
-    DbBlock* block = this->file.get(this->file.get_last_blockid());
+    DbBlock* block = this->file.get(this->file.get_last_block_id());
     RecordID recordId;
     try {
         recordId = block->add(data);
-    } catch (DbRelationError e) {
+    } catch (const DbRelationError &) {
         block = this->file.get_new();
         recordId = block->add(data);
     }
@@ -360,7 +355,7 @@ Handle HeapTable::append(const ValueDict *row) {
 
 
 void HeapTable::drop() {
-    delete this->file;
+
 }
 
 // return the bits to go into the file
@@ -429,6 +424,42 @@ ValueDict* HeapTable::unmarshal(Dbt* data) {
     return retRow;
 }
 
-bool test_heap_storage() {return true;}
+bool test_heap_storage() {
+    ColumnNames column_names;
+    column_names.push_back("a");
+    column_names.push_back("b");
+    ColumnAttributes column_attributes;
+    ColumnAttribute ca(ColumnAttribute::INT);
+    column_attributes.push_back(ca);
+    ca.set_data_type(ColumnAttribute::TEXT);
+    column_attributes.push_back(ca);
+    HeapTable table1("_test_create_drop_cpp", column_names, column_attributes);
+    table1.create();
+    std::cout << "create ok" << std::endl;
+    table1.drop();  // drop makes the object unusable because of BerkeleyDB restriction -- maybe want to fix this some day
+    std::cout << "drop ok" << std::endl;
 
+    HeapTable table("_test_data_cpp", column_names, column_attributes);
+    table.create_if_not_exists();
+    std::cout << "create_if_not_exsts ok" << std::endl;
 
+    ValueDict row;
+    row["a"] = Value(12);
+    row["b"] = Value("Hello!");
+    std::cout << "try insert" << std::endl;
+    table.insert(&row);
+    std::cout << "insert ok" << std::endl;
+    Handles* handles = table.select();
+    std::cout << "select ok " << handles->size() << std::endl;
+    ValueDict *result = table.project((*handles)[0]);
+    std::cout << "project ok" << std::endl;
+    Value value = (*result)["a"];
+    if (value.n != 12)
+        return false;
+    value = (*result)["b"];
+    if (value.s != "Hello!")
+        return false;
+    table.drop();
+
+    return true;
+}
