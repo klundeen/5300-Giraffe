@@ -8,6 +8,7 @@ Compiles/builds but doesn't run test_heap_storage() correctly
 
 ### Errors
 When running test_heap_storage(), traced segmentation fault to SlottedPage::address() using cout
+
 Possible errors in HeapTable::validate because not all Python code was included
 
 ## How to build
