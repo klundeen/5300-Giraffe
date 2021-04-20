@@ -32,10 +32,9 @@ $ make
 ```
 **Remember to have [Berkeley DB data](https://seattleu.instructure.com/courses/1597073/pages/getting-set-up-on-cs1?module_item_id=17258588) in your directory on cs1**
 ```
+Execute the program using this format
 $ ./5300-Giraffe ../data
 ```
-
-
 You can pull the tag for Milestone 1
 ```
 $ git checkout tags/Milestone1
