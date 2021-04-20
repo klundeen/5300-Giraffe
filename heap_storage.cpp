@@ -17,7 +17,9 @@ SlottedPage::SlottedPage(Dbt &block, BlockID block_id, bool is_new) : DbBlock(bl
         this->end_free = DbBlock::BLOCK_SZ - 1;
         put_header();
     } else {
+        cout << "before slottedpage get_header" << endl;
         get_header(this->num_records, this->end_free);
+        cout << "after get_header" << endl;
     }
 }
 
@@ -42,9 +44,7 @@ Dbt* SlottedPage::get(RecordID record_id) {
 		{
 			return nullptr;
 		}
-		Dbt* data = new Dbt();
-        memcpy(data->get_data(), address(loc), size);
-		return data;
+		return new Dbt(this->address(loc), size);
 }
 
 void SlottedPage::put(RecordID record_id, const Dbt &data) {
@@ -128,6 +128,7 @@ void SlottedPage::slide(u_int16_t start, u_int16_t end) {
 
 
 u_int16_t SlottedPage::get_n(u_int16_t offset) {
+    cout << "SlotPage get_n val of offset" << offset << endl;
     return *(u_int16_t *)this->address(offset);
 }
 
@@ -136,6 +137,8 @@ void SlottedPage::put_n(u_int16_t offset, u_int16_t n) {
 }
 
 void* SlottedPage::address(u_int16_t offset) {
+    cout << "SlotPage offset val:" << offset << endl;
+    cout << "address char*: " << *(char*)this->block.get_data() << endl;
     return (void*)((char*)this->block.get_data() + offset);
 }
 
@@ -154,8 +157,7 @@ void HeapFile::drop() {
 }
 
 void HeapFile::open(void){
-	this->db_open(DB_CREATE);
->>>>>>> 1e47a1fdf71ba9904084c9965c45518693eb8bc0
+	this->db_open();
 	// HeapFile doesn't have a block_size variable, python line not included
 	//this->block_size = this->stat['re_len'];
 
@@ -185,13 +187,14 @@ SlottedPage* HeapFile::get_new(void) {
 }
 
 SlottedPage* HeapFile::get(BlockID block_id){
-    Dbt* key = new Dbt();
-    Dbt* data = new Dbt();
-    void* id = &block_id;
-    key->set_data(id);
-    this->db.get(NULL, key, data, 0);
-    SlottedPage* retPage = new SlottedPage(*data, block_id, false);
-	return retPage;
+    cout << "heapfile get val of block_id" << block_id << endl;
+    Dbt key(&block_id, sizeof(block_id));
+    cout << "key.getdata" << *(BlockID*)key.get_data() << endl;
+    Dbt data;
+    cout << "before db.get" << endl;
+    this->db.get(nullptr, &key, &data, 0);
+    cout << "after db.get" << endl;
+    return new SlottedPage(data, block_id, false);
 }
 
 
@@ -210,11 +213,6 @@ BlockIDs* HeapFile::block_ids(){
 	return blockIDs;
 }
 
-<<<<<<< HEAD
-u_int32_t HeapFile::get_last_block_id() { 
-	return last; 
-}
-
 //confused about this one
 void HeapFile::db_open(uint flags){
 	if (!this->closed){
@@ -223,10 +221,12 @@ void HeapFile::db_open(uint flags){
 	this->db.set_re_len(DbBlock::BLOCK_SZ); //does this function exist?
 	this->dbfilename = this->name + ".db"; //what is this->name?
 	this->db.open(nullptr, this->dbfilename.c_str(), nullptr, DB_RECNO, flags, 0644);
+    cout << "val of last before stat block" << last << endl;
     if (flags == 0) {
         DB_BTREE_STAT stat;
         this->db.stat(nullptr, &stat, DB_FAST_STAT);
         this->last = stat.bt_ndata;
+        cout << "heapfile dbopen val of last: " << last << endl;
     } else {
         this->last = 0;
     }
@@ -249,7 +249,8 @@ void HeapTable::create() {
 void HeapTable::create_if_not_exists() {
     try {
         this->open();
-    } catch (const DbRelationError &) {
+    } catch (DbRelationError e) {
+        cout << "heaptable create ifnotexist catch section" << endl;
         this->create();
     }
 }
@@ -344,7 +345,10 @@ ValueDict* HeapTable::validate(const ValueDict *row) {
 
 Handle HeapTable::append(const ValueDict *row) {
     Dbt* data = marshal(row);
-    DbBlock* block = this->file.get(this->file.get_last_block_id());
+    cout << "after marshall call" << endl;
+    cout << "value of file.get_last_block" << this->file.get_last_block_id() << endl;
+    SlottedPage* block = this->file.get(this->file.get_last_block_id());
+    cout << "after file.get call" << endl;
     RecordID recordId;
     try {
         recordId = block->add(data);
@@ -352,10 +356,13 @@ Handle HeapTable::append(const ValueDict *row) {
         block = this->file.get_new();
         recordId = block->add(data);
     }
+    cout << "after trycatch" << endl;
     this->file.put(block);
     Handle toAppend;
+    cout << "before adding first+second" << endl;
     toAppend.first = block->get_block_id();
     toAppend.second = recordId;
+    cout << "heaptable append ok" << endl;
     return toAppend;
 }
 
