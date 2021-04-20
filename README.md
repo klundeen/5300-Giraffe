@@ -14,6 +14,9 @@ When running test_heap_storage(), traced segmentation fault to SlottedPage::addr
 
 Possible errors in HeapTable::validate because not all Python code was included
 
+reference to similar error report found online: https://community.oracle.com/tech/developers/discussion/886133/segmentation-fault-error-in-simple-program-please-help
+(Note that they were trying to cast to a string* not a char*... we needed to cast to a char* to then add the offset)
+
 ## How to build
 On cs1, clone the repo and build executable by using Makefile
 ```
