@@ -176,4 +176,3 @@ protected:
 };
 
 bool test_heap_storage();
-
