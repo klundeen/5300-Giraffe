@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <string>
 #include "db_cxx.h"
+#include "heap_storage.h"
 #include "SQLParser.h"
 #include "sqlhelper.h"
 
@@ -14,6 +15,8 @@ const unsigned int BLOCK_SZ = 4096;
 
 using namespace std;
 using namespace hsql;
+
+DbEnv* _DB_ENV;
 
 // forward declaration headers
 string operatorExpressionToString(const Expr *expr);
@@ -303,27 +306,29 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Usage: ./sqlshell cpsc5300/data\n");
         return -1;
     }
-    string envdir = string(argv[1]);
+    char* envdir = argv[1];
     cout << "\n in working environment: " << envdir << "\n" << endl;
     cout << "\n Enter SQL statements OR 'quit' to quit" << "\n" << endl;
     DbEnv env(0U);
     env.set_message_stream(&std::cout);
     env.set_error_stream(&std::cerr);
-    env.open(envdir.c_str(), DB_CREATE | DB_INIT_MPOOL, 0);
-
-    Db db(&env, 0);
-    db.set_message_stream(env.get_message_stream());
-    db.set_error_stream(env.get_error_stream());
-    db.set_re_len(BLOCK_SZ); // Set record length to 4K
-    db.open(NULL, SQL_DB, NULL, DB_RECNO, DB_CREATE | DB_TRUNCATE, 0644); // Erases anything already there
+    try {
+        env.open(envdir, DB_CREATE | DB_INIT_MPOOL, 0);
+    } catch (DbException &exc) {
+        cerr << "(sql5300: " << exc.what() << ")";
+        exit(1);
+    }
+    // Erases anything already there
+    _DB_ENV = &env;
 
     string query = "";
     while(query != "quit") {
         cout << "SQL > ";
         getline(cin, query);
         cout << "\ninput query: " << query << endl;
-
-        if (query != "quit") {
+        if (query == "test") {
+            cout << "test_heap_storage: " << (test_heap_storage() ? "ok" : "failed") << endl;
+        } else if (query != "quit") {
             // execute
             SQLParserResult* result = SQLParser::parseSQLString(query);
             cout << "Parse result size: " << result->size() << endl;
