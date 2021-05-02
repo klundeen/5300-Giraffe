@@ -1,47 +1,29 @@
-# 5300-Giraffe
-## Sprint 1 - Cheng and Bruno
+# 5300-Instructor
+Instructor's DB Relation Manager project for CPSC5300/4300 at Seattle U, Spring 2021
 
-## Milestone 1 Status: Complete
+Usage (argument is database directory):
+<pre>
+$ ./sql5300 ~/cpsc5300/data
+</pre>
 
-## Milestone 2 Status: Incomplete
-Compiles/builds but doesn't run test_heap_storage() correctly
-
-## Video Hand-off link
-https://youtu.be/tiNsdaldAEU
-
-### Errors
-When running test_heap_storage(), traced segmentation fault to SlottedPage::address() using cout
-
-Possible errors in HeapTable::validate because not all Python code was included
-
-reference to similar error report found online: https://community.oracle.com/tech/developers/discussion/886133/segmentation-fault-error-in-simple-program-please-help
-(Note that they were trying to cast to a string* not a char*... we needed to cast to a char* to then add the offset)
-
-## How to build
-On cs1, clone the repo and build executable by using Makefile
+## Tags
+- <code>Milestone1</code> is playing around with the AST returned by the HyLine parser and general setup of the command loop.
+- <code>Milestone2h</code> has the intructor-provided files for Milestone2. (Note that heap_storage.cpp is just a stub.)
+- <code>Milestone2</code> is the instructor's attempt to complete the Milestone 2 assignment.
+- <code>Milestone3_prep</code> has the instructor-provided files for Milestone 3. The students' work is in <code>SQLExec.cpp</code> labeled with <code>FIXME</code>.
+## Unit Tests
+There are some tests for SlottedPage and HeapTable. They can be invoked from the <code>SQL</code> prompt:
+```sql
+SQL> test
 ```
-$ cd ~/cpsc5300
-$ git clone https://github.com/klundeen/5300-Giraffe.git
-$ cd 5300-Giraffe
-$ make 
+Be aware that failed tests may leave garbage Berkeley DB files lingering in your data directory. If you don't care about any data in there, you are advised to just delete them all after a failed test.
+```sh
+$ rm -f data/*
 ```
-Run "make clean" to remove files, then run "make" for a clean build
 
-**Remember to have [Berkeley DB data](https://seattleu.instructure.com/courses/1597073/pages/getting-set-up-on-cs1?module_item_id=17258588) in your directory on cs1**
-Execute the program using this format
+## Valgrind (Linux)
+To run valgrind (files must be compiled with <code>-ggdb</code>):
+```sh
+$ valgrind --leak-check=full --suppressions=valgrind.supp ./sql5300 data
 ```
-$ ./5300-Giraffe ../data
-```
-You can pull the tag for Milestone 1
-```
-$ git checkout tags/Milestone1
-```
-You can pull the tag for Milestone 2
-```
-$ git checkout tags/Milestone2
-```
-[Berkeley DB C++ API Reference](https://docs.oracle.com/cd/E17076_05/html/api_reference/CXX/frame_main.html) for db_cxx.h
-
-In heap_storage.cpp, HeapTable did not implement the following functions because they were not required for milestone 2.
-* virtual void update(const Handle handle, const ValueDict *new_values);
-* virtual void del(const Handle handle);
+Note that we've added suppression for the known issues with the Berkeley DB library <em>vis-à-vis</em> valgrind.
