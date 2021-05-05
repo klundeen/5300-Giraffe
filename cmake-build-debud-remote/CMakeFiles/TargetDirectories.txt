@@ -1,3 +1,0 @@
-/home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/cmake-build-debud-remote/CMakeFiles/rebuild_cache.dir
-/home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/cmake-build-debud-remote/CMakeFiles/5300-Giraffe.dir
-/home/st/bruizdesomocurcio/cpsc5300/5300-Giraffe/cmake-build-debud-remote/CMakeFiles/edit_cache.dir
