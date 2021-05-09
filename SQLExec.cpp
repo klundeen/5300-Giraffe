@@ -290,12 +290,12 @@ QueryResult *SQLExec::show_index(const ShowStatement *statement){
   where["table_name"] = Value(table_name);
 
   Handles *handles = SQLExec::indices->select(&where);
-  u_long message = handles->size() - 3;
+  u_long message = handles->size();
 
 
   ValueDicts *rows = new ValueDicts;
   for (auto const &handle: *handles){
-    ValueDict *row = SQLExec::tables->project(handle, col_names);
+    ValueDict *row = SQLExec::tables->project(handle, col_names);//maybe indices
     Identifier table_name = row->at("table_name").s;
     if (table_name != Tables::TABLE_NAME && table_name != Columns::TABLE_NAME && table_name != Indices::TABLE_NAME){
       rows->push_back(row);
