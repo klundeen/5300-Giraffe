@@ -275,8 +275,17 @@ QueryResult *SQLExec::show_index(const ShowStatement *statement){
 
   Identifier table_name = statement->tableName;
   ColumnNames *col_names = new ColumnNames;
- 
   ColumnAttributes *col_attributes = new ColumnAttributes;
+
+  col_names->push_back("table_name");
+  col_names->push_back("index_name");
+  col_names->push_back("seq_in_index");
+  col_names->push_back("column_name");
+  col_names->push_back("index_type");
+  col_names->push_back("is_unique");
+  col_attributes->push_back(ColumnAttribute(ColumnAttribute::TEXT));
+  
+
   ValueDict where;
   where["table_name"] = Value(table_name);
 
@@ -285,18 +294,20 @@ QueryResult *SQLExec::show_index(const ShowStatement *statement){
 
 
   ValueDicts *rows = new ValueDicts;
-  for (auto const &handle: *handles) {
-    ValueDict *row = SQLExec::indices->project(handle, col_names);
+  for (auto const &handle: *handles){
+    ValueDict *row = SQLExec::tables->project(handle, col_names);
     Identifier table_name = row->at("table_name").s;
-    if (table_name != Tables::TABLE_NAME && table_name != Columns::TABLE_NAME && table_name != Indices::TABLE_NAME)
+    if (table_name != Tables::TABLE_NAME && table_name != Columns::TABLE_NAME && table_name != Indices::TABLE_NAME){
       rows->push_back(row);
-    else
+    }
+    else{
       delete row;
+    }
   }
   delete handles;
   
   
-  return new QueryResult(col_names, col_attributes, rows, "successfully returned" + to_string(message) + " rows");
+  return new QueryResult(col_names, col_attributes, rows, "successfully returned " + to_string(message) + " rows");
 }
 
 
