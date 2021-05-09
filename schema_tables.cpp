@@ -14,6 +14,10 @@ void initialize_schema_tables() {
     Columns columns;
     columns.create_if_not_exists();
     columns.close();
+    Indices indices;
+    indices.create_if_not_exists();
+    indices.close();
+
 }
 
 // Not terribly useful since the parser weeds most of these out
@@ -33,7 +37,7 @@ bool is_acceptable_identifier(Identifier identifier) {
 }
 
 bool is_acceptable_data_type(std::string dt) {
-    return dt == "INT" || dt == "TEXT";  // for now
+    return dt == "INT" || dt == "TEXT" || dt == "BOOLEAN";  // for now
 }
 
 
@@ -80,6 +84,8 @@ void Tables::create() {
     insert(&row);
     row["table_name"] = Value("_columns");
     insert(&row);
+    row["table_name"] = Value("_indices");
+    insert(&row);
 }
 
 // Manually check that table_name is unique.
@@ -99,6 +105,7 @@ void Tables::del(Handle handle) {
     // remove from cache, if there
     ValueDict *row = project(handle);
     Identifier table_name = row->at("table_name").s;
+    delete row;
     if (Tables::table_cache.find(table_name) != Tables::table_cache.end()) {
         DbRelation *table = Tables::table_cache.at(table_name);
         Tables::table_cache.erase(table_name);
@@ -123,7 +130,17 @@ void Tables::get_columns(Identifier table_name, ColumnNames &column_names, Colum
         Identifier column_name = (*row)["column_name"].s;
         column_names.push_back(column_name);
 
-        column_attribute.set_data_type((*row)["data_type"].s == "INT" ? ColumnAttribute::INT : ColumnAttribute::TEXT);
+        ColumnAttribute::DataType data_type;
+        if ((*row)["data_type"].s == "INT")
+            data_type = ColumnAttribute::INT;
+        else if ((*row)["data_type"].s == "TEXT")
+            data_type = ColumnAttribute::TEXT;
+        else if ((*row)["data_type"].s == "BOOLEAN")
+            data_type = ColumnAttribute::BOOLEAN;
+        else
+            throw DbRelationError("Unknown data type");
+        column_attribute.set_data_type(data_type);
+
         column_attributes.push_back(column_attribute);
 
         delete row;
@@ -154,7 +171,7 @@ DbRelation &Tables::get_table(Identifier table_name) {
  */
 const Identifier Columns::TABLE_NAME = "_columns";
 
-// get the column name for _tables column
+// get the column name for _columns column
 ColumnNames &Columns::COLUMN_NAMES() {
     static ColumnNames cn;
     if (cn.empty()) {
@@ -165,7 +182,7 @@ ColumnNames &Columns::COLUMN_NAMES() {
     return cn;
 }
 
-// get the column attribute for _tables column
+// get the column attribute for _columns column
 ColumnAttributes &Columns::COLUMN_ATTRIBUTES() {
     static ColumnAttributes cas;
     if (cas.empty()) {
@@ -177,7 +194,7 @@ ColumnAttributes &Columns::COLUMN_ATTRIBUTES() {
     return cas;
 }
 
-// ctor - we have a fixed table structure of just one column: table_name
+// ctor - we have a fixed table structure
 Columns::Columns() : HeapTable(TABLE_NAME, COLUMN_NAMES(), COLUMN_ATTRIBUTES()) {
 }
 
@@ -195,6 +212,22 @@ void Columns::create() {
     row["column_name"] = Value("column_name");
     insert(&row);
     row["column_name"] = Value("data_type");
+    insert(&row);
+
+    row["table_name"] = Value("_indices");
+    row["column_name"] = Value("table_name");
+    insert(&row);
+    row["column_name"] = Value("index_name");
+    insert(&row);
+    row["column_name"] = Value("column_name");
+    insert(&row);
+    row["column_name"] = Value("index_type");
+    insert(&row);
+    row["column_name"] = Value("seq_in_index");
+    row["data_type"] = Value("INT");
+    insert(&row);
+    row["column_name"] = Value("is_unique");
+    row["data_type"] = Value("BOOLEAN");
     insert(&row);
 }
 
@@ -221,6 +254,7 @@ Handle Columns::insert(const ValueDict *row) {
 
     return HeapTable::insert(row);
 }
+
 
 /*
  * ****************************

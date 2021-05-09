@@ -6,6 +6,7 @@ using namespace hsql;
 
 // define static data
 Tables *SQLExec::tables = nullptr;
+Indices *SQLExec::indices = nullptr;
 
 // make query result be printable
 ostream &operator<<(ostream &out, const QueryResult &qres) {
@@ -62,6 +63,10 @@ QueryResult *SQLExec::execute(const SQLStatement *statement) {
   
   if(SQLExec::tables == nullptr){
     SQLExec::tables = new Tables();
+  }
+
+  if(SQLExec::indices == nullptr){
+    SQLExec::indices = new Indices();
   }
   
   try {
@@ -216,6 +221,7 @@ QueryResult *SQLExec::drop_table(const DropStatement *statement) {
   
   // remove table from _tables schema
   SQLExec::tables->del(*SQLExec::tables->select(&where)->begin()); 
+  delete handles;//added in, wasnt there
   
   return new QueryResult(std::string("dropped " + tableName));
 }
@@ -223,18 +229,31 @@ QueryResult *SQLExec::drop_table(const DropStatement *statement) {
 QueryResult *SQLExec::drop_index(const DropStatement *statement){
 
   //check if the statement is a drop statement
-  /*  if(statement->type != DropStatement::kTable){
-    throuw SQLExecError("unrecognized DROP type");
+  if(statement->type != DropStatement::kTable){
+    throw SQLExecError("unrecognized DROP type");
   }
-
-  Identifier tableName = statement->name;
-
-  DbRelation &table 
-    
-  */
-
   
-  return new QueryResult("kjfn");
+  Identifier table_name = statement->name;
+  Identifier index_name = statement->indexName;
+  
+  ValueDict where;
+  where["table_name"] = Value(table_name);
+  where["index_name"] = Value(index_name);
+
+
+  DbIndex &index = SQLExec::indices->get_index(table_name, index_name);
+
+  //remove index
+  index.drop();
+
+  //remove rows from _indices
+  Handles *handles = SQLExec::indices->select(&where);
+  for(auto const &handle: *handles){
+    SQLExec::indices->del(handle);
+  }
+  delete handles;
+
+  return new QueryResult(std::string("dropped " + index_name));
 }
 
 QueryResult *SQLExec::show(const ShowStatement *statement) {
@@ -244,8 +263,8 @@ QueryResult *SQLExec::show(const ShowStatement *statement) {
     return show_tables();
   case ShowStatement::kColumns:
     return show_columns(statement);
-    /*  case ShowStatement::KIndex:
-        return show_index(statement);*/
+  case ShowStatement::kIndex:
+    return show_index(statement);
   default:
     throw SQLExecError("Unrecognized SHOW type");
   }
@@ -254,9 +273,30 @@ QueryResult *SQLExec::show(const ShowStatement *statement) {
 
 QueryResult *SQLExec::show_index(const ShowStatement *statement){
 
+  Identifier table_name = statement->tableName;
+  ColumnNames *col_names = new ColumnNames;
+ 
+  ColumnAttributes *col_attributes = new ColumnAttributes;
+  ValueDict where;
+  where["table_name"] = Value(table_name);
+
+  Handles *handles = SQLExec::indices->select(&where);
+  u_long message = handles->size() - 3;
 
 
-  return new QueryResult("kjfn");
+  ValueDicts *rows = new ValueDicts;
+  for (auto const &handle: *handles) {
+    ValueDict *row = SQLExec::indices->project(handle, col_names);
+    Identifier table_name = row->at("table_name").s;
+    if (table_name != Tables::TABLE_NAME && table_name != Columns::TABLE_NAME && table_name != Indices::TABLE_NAME)
+      rows->push_back(row);
+    else
+      delete row;
+  }
+  delete handles;
+  
+  
+  return new QueryResult(col_names, col_attributes, rows, "successfully returned" + to_string(message) + " rows");
 }
 
 
@@ -276,8 +316,8 @@ QueryResult *SQLExec::show_tables() {
     ValueDict *row = SQLExec::tables->project(handles, col_names);
     Identifier table_name = row->at("table_name").s;
     if(table_name != Tables::TABLE_NAME &&
-       table_name != Columns::TABLE_NAME /*&&
-        table_name != Indices::TABLE_NAME*/){
+       table_name != Columns::TABLE_NAME &&
+       table_name != Indices::TABLE_NAME){
       rows->push_back(row);
     }
     else{
@@ -292,6 +332,7 @@ QueryResult *SQLExec::show_tables() {
 
 QueryResult *SQLExec::show_columns(const ShowStatement *statement) {
 
+  Identifier table_name = statement->tableName;
   DbRelation &table = SQLExec::tables->get_table(Columns::TABLE_NAME);
 
   ColumnNames *col_names = new ColumnNames;
@@ -306,7 +347,7 @@ QueryResult *SQLExec::show_columns(const ShowStatement *statement) {
 
   col_attributes->push_back(ColumnAttribute(ColumnAttribute::TEXT));
 
-  results["table_name"] = Value(statement->tableName);
+  results["table_name"] = Value(table_name);
   Handles *handles = table.select(&results);
   u_long message = handles->size();
 

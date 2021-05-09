@@ -51,19 +51,15 @@ public:
      * @param column_attributes  returned by reference: list of corresponding
      *                           attributes for column_names
      */
-  //    virtual void get_columns(Identifier table_name, ColumnNames &column_names, ColumnAttributes &column_attributes);
     static void get_columns(Identifier table_name, ColumnNames &column_names, ColumnAttributes &column_attributes);
 
-  
     /**
      * Get the correctly instantiated DbRelation for a given table.
      * @param table_name  table to get
      * @returns           instantiated DbRelation of the correct type
      */
-    //virtual DbRelation &get_table(Identifier table_name);
     static DbRelation &get_table(Identifier table_name);
 
-  
 protected:
     // hard-coded columns for _tables table
     static ColumnNames &COLUMN_NAMES();
