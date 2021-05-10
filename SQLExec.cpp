@@ -235,8 +235,8 @@ QueryResult *SQLExec::drop_index(const DropStatement *statement){
   
   Identifier table_name = statement->name;
   Identifier index_name = statement->indexName;
-  
   ValueDict where;
+
   where["table_name"] = Value(table_name);
   where["index_name"] = Value(index_name);
 
@@ -295,7 +295,7 @@ QueryResult *SQLExec::show_index(const ShowStatement *statement){
 
   ValueDicts *rows = new ValueDicts;
   for (auto const &handle: *handles){
-    ValueDict *row = SQLExec::tables->project(handle, col_names);//maybe indices
+    ValueDict *row = SQLExec::indices->project(handle, col_names);
     Identifier table_name = row->at("table_name").s;
     if (table_name != Tables::TABLE_NAME && table_name != Columns::TABLE_NAME && table_name != Indices::TABLE_NAME){
       rows->push_back(row);
