@@ -113,7 +113,65 @@ QueryResult *SQLExec::create(const CreateStatement *statement) {
 }
 
 QueryResult *SQLExec::create_index(const CreateStatement *statement) {
-    return new QueryResult("create index not implemented");  // FIXME
+    if(statement->type != CreateStatement::kIndex)
+        throw SQLExecError("unrecognized CREATE type");
+
+    // get the index name and type
+    Identifier indexName = statement->indexName;
+    Identifier indexType = statement->indexType;
+
+    // get the table name
+    Identifier tableName = statement->tableName;
+
+    // get column names of table
+    ColumnNames colNames;
+    ColumnAttributes colAttributes;
+    ValueDict where;
+    where["table_name"] = tableName;
+    ValueDict results;
+
+    DbRelation &columnsTable = SQLExec::tables->get_table(Columns::TABLE_NAME);
+    Handles *colHandles = columnsTable.select(&where);
+    for (auto const &handle: *colHandles) {
+        results = *columnsTable.project(handle);
+        colNames.push_back(results["column_name"].s);
+    }
+    delete colHandles;
+
+    // get index column names and check if they exist in the table columns
+    char* indexCol;
+    std::vector<char*> indexCols;
+    for(char* col: *statement->indexColumns) {
+        indexCol = col;
+        if(std::find(colNames.begin(), colNames.end(), indexCol) == colNames.end())
+            throw SQLExecError("index column not found in table");
+        indexCols.push_back(indexCol);
+    }
+
+    // if all index columns exist in the table, add them to the _indices table
+    DbRelation &indexRelationTable = SQLExec::tables->get_table(Indices::TABLE_NAME);
+    Handle indexColHandle;
+    Handles indexColumnHandles;
+    int colNum = 0;
+    ValueDict row;
+    row["table_name"] = tableName;
+    row["index_name"] = indexName;
+    row["index_type"] = Value(indexType);
+    for(char* col: indexCols) {
+        row["column_name"] = Value(*col);
+        row["seq_in_index"] = ++colNum;
+        if(indexType == "BTREE")
+            row["is_unique"] = true;
+        else
+            row["is_unique"] = false;
+        indexColHandle = indexRelationTable.insert(&row);
+        indexColumnHandles.push_back(indexColHandle);
+    }
+
+    // DbIndex &newIndex = SQLExec::indices->get_index(tableName, indexName);
+    // newIndex.create();
+
+    return new QueryResult("created " + indexName);
 }
 
 QueryResult *SQLExec::create_table(const CreateStatement *statement) {
