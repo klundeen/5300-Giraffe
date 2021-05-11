@@ -161,9 +161,9 @@ QueryResult *SQLExec::create_index(const CreateStatement *statement) {
         row["column_name"] = Value(*col);
         row["seq_in_index"] = ++colNum;
         if(indexType == "BTREE")
-            row["is_unique"] = Value(true);
+            row["is_unique"] = Value("true");
         else
-            row["is_unique"] = Value(false);
+            row["is_unique"] = Value("false");
         // indexColHandle = indexRelationTable.insert(&row);
         indexColHandle = SQLExec::indices->insert(&row);
         indexColumnHandles.push_back(indexColHandle);
@@ -273,13 +273,24 @@ QueryResult *SQLExec::drop_table(const DropStatement *statement) {
     columns.del(handle);
   }
   delete handles;
+
+  // remove from _indices schema
+  DbRelation &indices = SQLExec::tables->get_table(Indices::TABLE_NAME);
+  Handles *indicesHandles = indices.select(&where);
+  Identifier indexName;
+  for (auto const &handle: *indicesHandles) {
+      indexName = (*indices.project(handle))["index_name"].s;
+      DbIndex &index = SQLExec::indices->get_index(tableName, indexName);
+      index.drop();
+      indices.del(handle);
+  }
+  delete indicesHandles;
   
   // remove table (drop and remove from cache, which I think is automatic when calling drop())
   table.drop();
   
   // remove table from _tables schema
   SQLExec::tables->del(*SQLExec::tables->select(&where)->begin()); 
-  delete handles;//added in, wasnt there
   
   return new QueryResult(std::string("dropped " + tableName));
 }
