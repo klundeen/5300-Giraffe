@@ -1,7 +1,25 @@
 # 5300-Instructor
-Instructor's DB Relation Manager project for CPSC5300/4300 at Seattle U, Spring 2021
 
-Usage (argument is database directory):
+#Spint Otoño
+Ben Gruher & Adama Sanoh
+First start by cloning the repository:
+<pre>
+git clone https://github.com/klundeen/5300-Giraffe
+</pre>
+## Mileston3: Schema Storage
+These functions were created:
+- <code>CREATE Table</code>
+- <code>DROP Table</code>
+- <code>SHOW Tables</code>
+- <code>SHOW Columns</code>
+All functions are working correctly.
+## Mileston4: Schema Storage
+These functions were created:
+- <code>CREATE Index</code>
+- <code>SHOW Index</code>
+- <code>DROP IndexDr</code>
+All functions are working with the exception of the show index and drop_table functions.
+## To run the program
 <pre>
 $ ./sql5300 ~/cpsc5300/data
 </pre>
