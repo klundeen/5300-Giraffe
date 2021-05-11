@@ -149,7 +149,7 @@ QueryResult *SQLExec::create_index(const CreateStatement *statement) {
     }
 
     // if all index columns exist in the table, add them to the _indices table
-    DbRelation &indexRelationTable = SQLExec::tables->get_table(Indices::TABLE_NAME);
+    // DbRelation &indexRelationTable = SQLExec::tables->get_table(Indices::TABLE_NAME);
     Handle indexColHandle;
     Handles indexColumnHandles;
     int colNum = 0;
@@ -161,15 +161,16 @@ QueryResult *SQLExec::create_index(const CreateStatement *statement) {
         row["column_name"] = Value(*col);
         row["seq_in_index"] = ++colNum;
         if(indexType == "BTREE")
-            row["is_unique"] = true;
+            row["is_unique"] = Value(true);
         else
-            row["is_unique"] = false;
-        indexColHandle = indexRelationTable.insert(&row);
+            row["is_unique"] = Value(false);
+        // indexColHandle = indexRelationTable.insert(&row);
+        indexColHandle = SQLExec::indices->insert(&row);
         indexColumnHandles.push_back(indexColHandle);
     }
 
-    // DbIndex &newIndex = SQLExec::indices->get_index(tableName, indexName);
-    // newIndex.create();
+    DbIndex &newIndex = SQLExec::indices->get_index(tableName, indexName);
+    newIndex.create();
 
     return new QueryResult("created " + indexName);
 }
@@ -260,7 +261,6 @@ QueryResult *SQLExec::drop_table(const DropStatement *statement) {
     throw SQLExecError("cannot drop schema tables");
   
   DbRelation &table = SQLExec::tables->get_table(tableName);
-  // FIXME - test whether table is null or other way to indicate that table doesn't exist?
   
   // where statement
   ValueDict where;
@@ -287,7 +287,7 @@ QueryResult *SQLExec::drop_table(const DropStatement *statement) {
 QueryResult *SQLExec::drop_index(const DropStatement *statement){
 
   //check if the statement is a drop statement
-  if(statement->type != DropStatement::kTable){
+  if(statement->type != DropStatement::kIndex){
     throw SQLExecError("unrecognized DROP type");
   }
   
