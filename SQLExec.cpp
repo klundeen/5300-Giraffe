@@ -158,7 +158,7 @@ QueryResult *SQLExec::create_index(const CreateStatement *statement) {
     row["index_name"] = indexName;
     row["index_type"] = Value(indexType);
     for(char* col: indexCols) {
-        row["column_name"] = Value(*col);
+        row["column_name"] = Value(string(col));
         row["seq_in_index"] = ++colNum;
         if(indexType == "BTREE")
             row["is_unique"] = Value("true");
