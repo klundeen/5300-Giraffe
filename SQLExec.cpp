@@ -4,6 +4,7 @@
  * @see "Seattle University, CPSC5300, Spring 2021"
  */
 #include "SQLExec.h"
+#include "EvalPlan.h"
 
 using namespace std;
 using namespace hsql;
@@ -89,7 +90,53 @@ QueryResult *SQLExec::execute(const SQLStatement *statement) {
 }
 
 QueryResult *SQLExec::insert(const InsertStatement *statement) {
-    return new QueryResult("INSERT statement not yet implemented");  // FIXME
+    // check if table exists
+    if (!checkIfTableExists(statement->tableName)) {
+        throw DbRelationError("table '" + string(statement->tableName) + "' does not exist");
+    }
+
+    // get underlying relation
+    DbRelation &table = SQLExec::tables->get_table(statement->tableName);
+    
+    const ColumnNames all_column_names = table.get_column_names();
+    ColumnNames *column_names = new ColumnNames;
+    // ColumnAttributes *column_attributes = new ColumnAttributes;
+
+    if (statement->columns != nullptr) {
+        if (statement->columns->size() != all_column_names.size()) {
+            throw DbRelationError("provided columns in insert statement do not match from expected");
+        }
+        for (auto const col : *statement->columns){
+            column_names->push_back(col);
+        }
+    } else {
+        for (auto const col : all_column_names){
+            column_names->push_back(col);
+        }
+    }
+
+    ValueDict row;
+    for (uint i =0; i < statement->values->size(); i++){
+        if (statement->values->at(i)->type == hsql::kExprLiteralString) {
+            row[column_names->at(i)] = Value(statement->values->at(i)->name);
+        } else if (statement->values->at(i)->type == hsql::kExprLiteralInt) {
+            row[column_names->at(i)] = Value(statement->values->at(i)->ival);
+        } else {
+            throw SQLExecError("Insert type is not implemented");
+        }
+    }
+
+    // insert row into table
+    Handle handle = table.insert(&row);
+
+    // Get indexes and insert the values
+    IndexNames indexes = SQLExec::indices->get_index_names(statement->tableName);
+    for(Identifier name : indexes){
+        DbIndex& index = SQLExec::indices->get_index(statement->tableName, name);
+        index.insert(handle);
+    }
+    
+    return new QueryResult("Successfully inserted 1 row into " + string(statement->tableName) + " and " + to_string(indexes.size()) + " indices");
 }
 
 QueryResult *SQLExec::del(const DeleteStatement *statement) {
@@ -97,7 +144,44 @@ QueryResult *SQLExec::del(const DeleteStatement *statement) {
 }
 
 QueryResult *SQLExec::select(const SelectStatement *statement) {
-    return new QueryResult("SELECT statement not yet implemented");  // FIXME
+    // check if table exists
+    if (!checkIfTableExists(statement->fromTable->name)) {
+        throw DbRelationError("table '" + string(statement->fromTable->name) + "' does not exist");
+    }
+
+    // get underlying relation
+    DbRelation &table = SQLExec::tables->get_table(statement->fromTable->name);
+    
+    ColumnNames *column_names = new ColumnNames;
+    ColumnNames all_column_names = table.get_column_names();
+    ColumnAttributes *column_attributes = new ColumnAttributes;
+
+    EvalPlan *selectPlan = new EvalPlan(table);
+
+    ValueDict *wherePlanInput = get_where_conjunction(statement->whereClause, &all_column_names);
+    if (wherePlanInput != nullptr) {
+        selectPlan = new EvalPlan(wherePlanInput, selectPlan);
+    }
+    if (statement->selectList->size() > 0 && (statement->selectList->at(0)->type == hsql::kExprStar)) {
+        cout << "statement->selectList->get(0) is: "<< statement->selectList->at(0)->type << endl;
+        for (const auto col: table.get_column_names()){
+            column_names->push_back(col);
+        }
+    } else {
+        for (hsql::Expr* col: *statement->selectList) {
+            cout << col->name << endl;
+            column_names->push_back(Identifier(col->name));
+        }
+        column_attributes = table.get_column_attributes(*column_names);
+    }
+    selectPlan = new EvalPlan(column_names, selectPlan);
+    
+    cout << "===> done with setting up plan about to optimize and evaluate" << endl;
+    //optimize the plan and evaluate the optimized plan
+    ValueDicts *rows = selectPlan->optimize()->evaluate();
+    cout << "done with optimize and evaluate" << endl;
+    return new QueryResult(column_names, column_attributes, rows,
+                           "successfuly returned " + to_string(rows->size()) + " rows");
 }
 
 void
@@ -391,3 +475,123 @@ QueryResult *SQLExec::show_columns(const ShowStatement *statement) {
     return new QueryResult(column_names, column_attributes, rows, "successfully returned " + to_string(n) + " rows");
 }
 
+/**
+ * check if the provided table exists in metadata
+ * @param tableName  table name to check
+ * @returns          bool indicating if the provided table name exists
+ */
+bool SQLExec::checkIfTableExists(const char* tableName) {
+    // setup query to see if table exists
+    ValueDict where;
+    where["table_name"] = Value(tableName);
+    Handles *handles = SQLExec::tables->select(&where);
+    bool resp = handles->size() > 0;
+    
+    delete handles;
+
+    return resp;
+}
+
+/**
+ * check if the provided column names exist for the provided table
+ * @param columns    vector/list of char pointers that would be obtained as indexColumns from CreateStatement
+ * @param indexname  table name to check for
+ */
+void SQLExec::checkIfColumnsExists(const std::vector<char*>* columns, const char* tableName) {
+    // get column table pointer
+    DbRelation &columnTable = SQLExec::tables->get_table(Columns::TABLE_NAME);
+
+    // setup column names for the table metdata
+    ColumnNames *column_names = new ColumnNames;
+    column_names->push_back("table_name");
+    column_names->push_back("column_name");
+    column_names->push_back("data_type");
+
+    // get all the colums for the provided table
+    ValueDict where;
+    where["table_name"] = Value(tableName);
+    Handles *handles = columnTable.select(&where);
+    std::vector<Value> *tableColumnsFound = new std::vector<Value>();
+    for (auto const &handle: *handles) {
+        ValueDict *row = columnTable.project(handle, column_names);
+        tableColumnsFound->push_back(row->at("column_name"));
+    }
+
+    // check if those columns exist and return exception if not
+    for (auto const &col: *columns) {
+        bool found = false;
+        string strCol = string(col);
+        for(const Value &tableCol: *tableColumnsFound) {
+            if (strCol.compare(tableCol.s) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            throw SQLExecError("column '" + strCol + "' does not exist for table '" + string(tableName)+ "'");
+        }
+    }
+
+    delete handles;
+}
+
+/**
+ * check if the provided index is created for the provided table
+ * @param tableName  table name to check for
+ * @param indexname  index name to check
+ * @returns          bool indicating if the provided index exists for table
+ */
+bool SQLExec::checkIfIndexExists(const char* tableName, const char* indexName) {
+    // get pointer to the index table
+    DbRelation &indexTable = SQLExec::tables->get_table(Indices::TABLE_NAME);
+    
+    // get all the indices for the provided table and index name
+    ValueDict where;
+    where["table_name"] = Value(tableName);
+    where["index_name"] = Value(indexName);
+    Handles *duplicateCheck = indexTable.select(&where);
+    // check and return if more than one, delete any empty pointers
+    bool resp = duplicateCheck->size() > 0;
+    delete duplicateCheck;
+    return resp;
+}
+
+ValueDict *SQLExec::get_where_conjunction(const hsql::Expr *expr, const ColumnNames *col_names) {
+    if (expr == nullptr) {
+        return nullptr;
+    }
+
+    if(expr->type != hsql::kExprOperator) {
+        throw DbRelationError("Unsupported operator passed!");
+    }
+    ValueDict* rows = new ValueDict;
+    if (expr->opType == Expr::AND) {
+        ValueDict* sub = get_where_conjunction(expr->expr, col_names);
+        if (sub != nullptr){
+            rows->insert(sub->begin(), sub->end());
+        }
+        sub = get_where_conjunction(expr->expr2, col_names);
+        rows->insert(sub->begin(), sub->end());
+    } else if (expr->opType == Expr::SIMPLE_OP) {
+        if(expr->opChar != '=') {
+            throw DbRelationError("only equality predicates currently supported");
+        }
+        Identifier col = expr->expr->name;
+        if(find(col_names->begin(), col_names->end(), col) == col_names->end()){
+            throw DbRelationError("unknown column '" + col + "'");
+        }
+        if(expr->expr2->type == kExprLiteralString) {
+            rows->insert(pair<Identifier, Value>(col, Value(expr->expr2->name)));
+        }
+        else if(expr->expr2->type == kExprLiteralInt) {
+            rows->insert(pair<Identifier, Value>(col, Value(expr->expr2->ival)));
+        }
+        else {
+            throw DbRelationError("Type is not supported");
+        }
+    } else {
+        throw DbRelationError("only supports AND conjunctions");
+    }
+
+    return rows;
+}
