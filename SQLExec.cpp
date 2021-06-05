@@ -103,9 +103,18 @@ QueryResult *SQLExec::insert(const InsertStatement *statement) {
     // ColumnAttributes *column_attributes = new ColumnAttributes;
 
     if (statement->columns != nullptr) {
-        if (statement->columns->size() != all_column_names.size()) {
+        if (statement->columns->size() > all_column_names.size()) {
             throw DbRelationError("provided columns in insert statement do not match from expected");
+        } else if (statement->columns->size() < all_column_names.size()) {
+            throw DbRelationError("don't know how to handle NULLs, defaults, etc. yet");
         }
+        
+        for (auto const col : *statement->columns) {
+            if (find(all_column_names.begin(), all_column_names.end(), col) == all_column_names.end()) {
+                throw SQLExecError("Invalid column name '" + string(col)+ "'");
+            }
+        }
+
         for (auto const col : *statement->columns){
             column_names->push_back(col);
         }
@@ -140,7 +149,45 @@ QueryResult *SQLExec::insert(const InsertStatement *statement) {
 }
 
 QueryResult *SQLExec::del(const DeleteStatement *statement) {
-    return new QueryResult("DELETE statement not yet implemented");  // FIXME
+    // check if table exists
+    if (!checkIfTableExists(statement->tableName)) {
+        throw DbRelationError("table '" + string(statement->tableName) + "' does not exist");
+    }
+
+    // get underlying relation
+    DbRelation &table = SQLExec::tables->get_table(statement->tableName);
+    
+    // get all columns to for get where conjunction
+    const ColumnNames all_column_names = table.get_column_names();
+
+
+    EvalPlan *deletePlan = new EvalPlan(table);
+
+
+    ValueDict *wherePlanInput = get_where_conjunction(statement->expr, &all_column_names);
+    if (wherePlanInput != nullptr) {
+        deletePlan = new EvalPlan(wherePlanInput, deletePlan);
+    }
+    EvalPipeline pipeline = deletePlan->optimize()->pipeline();
+
+
+    IndexNames indexes = SQLExec::indices->get_index_names(statement->tableName);
+    Handles *handles = pipeline.second;
+
+    //now delete all the handles
+    for( auto const &handle: *handles) {
+        for (uint i = 0; i < indexes.size(); i++) {
+            DbIndex &index = SQLExec::indices->get_index(statement->tableName, indexes.at(i));
+            index.del(handle);
+        }
+    }
+    uint numHandles = handles->size();
+    //remove from table
+    for (auto const& handle: *handles){
+        table.del(handle);
+    }
+    
+    return new QueryResult("successfully deleted " + to_string(numHandles)+ " rows from " + string(statement->tableName) + " and " + to_string(indexes.size()) + " indices");
 }
 
 QueryResult *SQLExec::select(const SelectStatement *statement) {
