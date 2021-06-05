@@ -47,6 +47,9 @@ ostream &operator<<(ostream &out, const QueryResult &qres) {
     return out;
 }
 
+/**
+ * Cleanup method for the QueryResult
+ */
 QueryResult::~QueryResult() {
     if (column_names != nullptr)
         delete column_names;
@@ -59,7 +62,11 @@ QueryResult::~QueryResult() {
     }
 }
 
-
+/**
+ * Execute the given SQL statement.
+ * @param statement   the Hyrise AST of the SQL statement to execute
+ * @returns           the query result (freed by caller)
+ */
 QueryResult *SQLExec::execute(const SQLStatement *statement) {
     // initialize _tables table, if not yet present
     if (SQLExec::tables == nullptr) {
@@ -89,6 +96,12 @@ QueryResult *SQLExec::execute(const SQLStatement *statement) {
     }
 }
 
+/**
+ * Inserts the data into the table. Will return exception if any
+ *  invalid user input (incorrect table, incorrect columns,...)
+ * @param statement  InsertStatement parsed from user input
+ * @return           QueryResult
+ */
 QueryResult *SQLExec::insert(const InsertStatement *statement) {
     // check if table exists
     if (!checkIfTableExists(statement->tableName)) {
@@ -148,6 +161,12 @@ QueryResult *SQLExec::insert(const InsertStatement *statement) {
     return new QueryResult("Successfully inserted 1 row into " + string(statement->tableName) + " and " + to_string(indexes.size()) + " indices");
 }
 
+/**
+ * Deletes the data from the table. Will return exception if any
+ *  invalid user input (incorrect table)
+ * @param statement  DeleteStatement parsed from user input
+ * @return           QueryResult
+ */
 QueryResult *SQLExec::del(const DeleteStatement *statement) {
     // check if table exists
     if (!checkIfTableExists(statement->tableName)) {
@@ -190,6 +209,12 @@ QueryResult *SQLExec::del(const DeleteStatement *statement) {
     return new QueryResult("successfully deleted " + to_string(numHandles)+ " rows from " + string(statement->tableName) + " and " + to_string(indexes.size()) + " indices");
 }
 
+/**
+ * Returns the data from the table. Will return exception if any
+ *  invalid user input (incorrect table, columns)
+ * @param statement  SelectStatement parsed from user input
+ * @return           QueryResult
+ */
 QueryResult *SQLExec::select(const SelectStatement *statement) {
     // check if table exists
     if (!checkIfTableExists(statement->fromTable->name)) {
@@ -210,7 +235,6 @@ QueryResult *SQLExec::select(const SelectStatement *statement) {
         selectPlan = new EvalPlan(wherePlanInput, selectPlan);
     }
     if (statement->selectList->size() > 0 && (statement->selectList->at(0)->type == hsql::kExprStar)) {
-        cout << "statement->selectList->get(0) is: "<< statement->selectList->at(0)->type << endl;
         for (const auto col: table.get_column_names()){
             column_names->push_back(col);
         }
@@ -223,16 +247,19 @@ QueryResult *SQLExec::select(const SelectStatement *statement) {
     }
     selectPlan = new EvalPlan(column_names, selectPlan);
     
-    cout << "===> done with setting up plan about to optimize and evaluate" << endl;
     //optimize the plan and evaluate the optimized plan
     ValueDicts *rows = selectPlan->optimize()->evaluate();
-    cout << "done with optimize and evaluate" << endl;
     return new QueryResult(column_names, column_attributes, rows,
                            "successfuly returned " + to_string(rows->size()) + " rows");
 }
 
-void
-SQLExec::column_definition(const ColumnDefinition *col, Identifier &column_name, ColumnAttribute &column_attribute) {
+/**
+ * Pull out column name and attributes from AST's column definition clause
+ * @param col                AST column definition
+ * @param column_name        returned by reference
+ * @param column_attributes  returned by reference
+ */
+void SQLExec::column_definition(const ColumnDefinition *col, Identifier &column_name, ColumnAttribute &column_attribute) {
     column_name = col->name;
     switch (col->type) {
         case ColumnDefinition::INT:
@@ -247,7 +274,11 @@ SQLExec::column_definition(const ColumnDefinition *col, Identifier &column_name,
     }
 }
 
-// CREATE ...
+/**
+ * Creates the specified table with provided columns in statement
+ * @param statement     statement with table to create with specified columns
+ * @return QueryResult  The result of the create query
+ */
 QueryResult *SQLExec::create(const CreateStatement *statement) {
     switch (statement->type) {
         case CreateStatement::kTable:
@@ -259,6 +290,11 @@ QueryResult *SQLExec::create(const CreateStatement *statement) {
     }
 }
 
+/**
+ * Creates the specified table with provided columns in statement
+ * @param statement     statement with table to create with specified columns
+ * @return QueryResult  The result of the create query
+ */
 QueryResult *SQLExec::create_table(const CreateStatement *statement) {
     Identifier table_name = statement->tableName;
     ColumnNames column_names;
@@ -311,6 +347,11 @@ QueryResult *SQLExec::create_table(const CreateStatement *statement) {
     return new QueryResult("created " + table_name);
 }
 
+/**
+ * Creates the specified index for the provided table name in statement
+ * @param statement     statement with index to create with specified table
+ * @return QueryResult  The result of the create query
+ */
 QueryResult *SQLExec::create_index(const CreateStatement *statement) {
     Identifier index_name = statement->indexName;
     Identifier table_name = statement->tableName;
@@ -353,7 +394,11 @@ QueryResult *SQLExec::create_index(const CreateStatement *statement) {
     return new QueryResult("created index " + index_name);
 }
 
-// DROP ...
+/**
+ * Drop the specified table name or index
+ * @param statement     statement with table name/index to drop
+ * @return QueryResult  The result of the drop query
+ */
 QueryResult *SQLExec::drop(const DropStatement *statement) {
     switch (statement->type) {
         case DropStatement::kTable:
@@ -365,6 +410,11 @@ QueryResult *SQLExec::drop(const DropStatement *statement) {
     }
 }
 
+/**
+ * Drop the specified table name or index
+ * @param statement     statement with table name to drop
+ * @return QueryResult  The result of the drop query
+ */
 QueryResult *SQLExec::drop_table(const DropStatement *statement) {
     Identifier table_name = statement->name;
     if (table_name == Tables::TABLE_NAME || table_name == Columns::TABLE_NAME)
@@ -404,6 +454,11 @@ QueryResult *SQLExec::drop_table(const DropStatement *statement) {
     return new QueryResult(string("dropped ") + table_name);
 }
 
+/**
+ * Drop the specified index
+ * @param statement     statement with index to drop
+ * @return QueryResult  The result of the drop query
+ */
 QueryResult *SQLExec::drop_index(const DropStatement *statement) {
     Identifier table_name = statement->name;
     Identifier index_name = statement->indexName;
@@ -424,7 +479,10 @@ QueryResult *SQLExec::drop_index(const DropStatement *statement) {
     return new QueryResult("dropped index " + index_name);
 }
 
-// SHOW ...
+/**
+ * Internal method for show statement, shall call show columns, table, index...
+ * @return QueryResult  The result of the show query
+ */
 QueryResult *SQLExec::show(const ShowStatement *statement) {
     switch (statement->type) {
         case ShowStatement::kTables:
@@ -438,6 +496,11 @@ QueryResult *SQLExec::show(const ShowStatement *statement) {
     }
 }
 
+/**
+ * Display all the availalbe indexes for the provided table name
+ * @param statement     state with table name to get index
+ * @return QueryResult  The result of the show index query
+ */
 QueryResult *SQLExec::show_index(const ShowStatement *statement) {
     ColumnNames *column_names = new ColumnNames;
     ColumnAttributes *column_attributes = new ColumnAttributes;
@@ -474,6 +537,10 @@ QueryResult *SQLExec::show_index(const ShowStatement *statement) {
                            "successfully returned " + to_string(n) + " rows");
 }
 
+/**
+ * Shows all current tables in DB
+ * @return QueryResult  The result of the show columns query
+ */
 QueryResult *SQLExec::show_tables() {
     ColumnNames *column_names = new ColumnNames;
     column_names->push_back("table_name");
@@ -497,6 +564,11 @@ QueryResult *SQLExec::show_tables() {
     return new QueryResult(column_names, column_attributes, rows, "successfully returned " + to_string(n) + " rows");
 }
 
+/**
+ * Shows all columns for the provided table name
+ * @param statement     statement with table name
+ * @return QueryResult  The result of the show columns query
+ */
 QueryResult *SQLExec::show_columns(const ShowStatement *statement) {
     DbRelation &columns = SQLExec::tables->get_table(Columns::TABLE_NAME);
 
@@ -603,6 +675,15 @@ bool SQLExec::checkIfIndexExists(const char* tableName, const char* indexName) {
     return resp;
 }
 
+/**
+ * Returns the a map of column and value matches look for. Only allows
+ *  'AND' operator and '=' comparison, will throw exception otherwise.
+ *  invalid user input (incorrect table, columns)
+ * @param expr          where statement expression parsed from 
+ *                          select/delete statement
+ * @param column_names  All the column names of the table
+ * @return              map of column and values to match for.
+ */
 ValueDict *SQLExec::get_where_conjunction(const hsql::Expr *expr, const ColumnNames *col_names) {
     if (expr == nullptr) {
         return nullptr;
