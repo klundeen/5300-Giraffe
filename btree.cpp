@@ -71,9 +71,9 @@ void BTreeIndex::close() {
 // names in the index. Returns a list of row handles.
 Handles *BTreeIndex::lookup(ValueDict *key_dict) const {
     KeyValue *keyval = this->tkey(key_dict);
-
     return this->_lookup(this->root,this->stat->get_height(),keyval);
 }
+
 
 Handles *BTreeIndex::range(ValueDict *min_key, ValueDict *max_key) const {
     throw DbRelationError("Don't know how to do a range query on Btree index yet");
@@ -113,6 +113,18 @@ Insertion BTreeIndex::_insert(BTreeNode *node, uint height, const KeyValue *key,
         if (!BTreeNode::insertion_is_none(insertion))
             insertion = interior->insert(&insertion.second, insertion.first);
         return insertion;
+    }
+}
+
+Handles *BTreeIndex::_lookup(BTreeNode *node, uint height, const KeyValue *key) const{
+    Handles *handles = new Handles;
+    if(height == 1){
+        auto *leaf = dynamic_cast<BTreeLeaf *>(node);
+        handles->push_back(leaf->find_eq(key));
+        return handles;
+    }else{
+        auto *interior = dynamic_cast<BTreeInterior *>(node);
+        return _lookup(interior->find(key,height),height -1, key);
     }
 }
 
