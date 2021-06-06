@@ -29,6 +29,7 @@ The `WHERE` statements only support `AND` conjunction and `=` operator
 These functions were created:
 - <code>Insert for test in test_btree()</code>
 - <code>Lookup for test in test_btree()</code>
+
 These functions are not supported:
 - delete
 - range
