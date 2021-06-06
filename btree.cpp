@@ -75,6 +75,7 @@ Handles *BTreeIndex::lookup(ValueDict *key_dict) const {
     return this->_lookup(this->root,this->stat->get_height(),keyval);
 }
 
+
 //Helper method for lookup
 //finds all the rows whose columns are equal to key
 Handles *BTreeIndex::_lookup(BTreeNode *node, uint height, const KeyValue *key) const{
