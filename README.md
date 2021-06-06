@@ -25,6 +25,7 @@ These functions were created:
 - <code>DELETE FROM table [WHERE ...]</code>
 - <code>SELECT [*|col1,col2...] FROM table [WHERE ...]</code>
 The `WHERE` statements only support `AND` conjunction and `=` operator
+## Mileston6
 ## To run the program
 <pre>
 $ ./sql5300 ~/cpsc5300/data
