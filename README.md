@@ -27,7 +27,8 @@ These functions were created:
 The `WHERE` statements only support `AND` conjunction and `=` operator
 ## Milestone 6: insert and lookup
 These functions were created:
-- <code>INSERT<code>
+- <code>Insert for test in test_btree()</code>
+- <code>Lookup for test in test_btree()</code>
 These functions are not supported:
 - delete
 - range
