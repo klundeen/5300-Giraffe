@@ -6,26 +6,31 @@ First start by cloning the repository:
 <pre>
 git clone https://github.com/klundeen/5300-Giraffe
 </pre>
-## Mileston3: Schema Storage
+## Milestone 3: Schema Storage
 These functions were created:
 - <code>CREATE Table</code>
 - <code>DROP Table</code>
 - <code>SHOW Tables</code>
 - <code>SHOW Columns</code>
 All functions are working correctly.
-## Mileston4: Schema Storage
+## Milestone 4: Schema Storage
 These functions were created:
 - <code>CREATE Index</code>
 - <code>SHOW Index</code>
 - <code>DROP IndexDr</code>
 All functions are working with the exception of the show index and drop_table functions.
-## Mileston5: Insert, Delete, Simple Queries
+## Milestone 5: Insert, Delete, Simple Queries
 These functions were created:
 - <code>INSERT INTO table [WHERE ...]</code>
 - <code>DELETE FROM table [WHERE ...]</code>
 - <code>SELECT [*|col1,col2...] FROM table [WHERE ...]</code>
 The `WHERE` statements only support `AND` conjunction and `=` operator
-## Mileston6
+## Milestone 6: insert and lookup
+These functions were created:
+- <code>INSERT<code>
+These functions are not supported:
+- delete
+- range
 ## To run the program
 <pre>
 $ ./sql5300 ~/cpsc5300/data
