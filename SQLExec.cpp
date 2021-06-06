@@ -182,14 +182,14 @@ QueryResult *SQLExec::del(const DeleteStatement *statement) {
 
     EvalPlan *deletePlan = new EvalPlan(table);
 
-
+    // build where object from the expression provided
     ValueDict *wherePlanInput = get_where_conjunction(statement->expr, &all_column_names);
     if (wherePlanInput != nullptr) {
         deletePlan = new EvalPlan(wherePlanInput, deletePlan);
     }
     EvalPipeline pipeline = deletePlan->optimize()->pipeline();
 
-
+    // get indexes and for the table
     IndexNames indexes = SQLExec::indices->get_index_names(statement->tableName);
     Handles *handles = pipeline.second;
 
@@ -230,17 +230,18 @@ QueryResult *SQLExec::select(const SelectStatement *statement) {
 
     EvalPlan *selectPlan = new EvalPlan(table);
 
+    // build conjunction from all the columns, not just the project ones.
     ValueDict *wherePlanInput = get_where_conjunction(statement->whereClause, &all_column_names);
     if (wherePlanInput != nullptr) {
         selectPlan = new EvalPlan(wherePlanInput, selectPlan);
     }
+    // check if the projected columns are all or selective
     if (statement->selectList->size() > 0 && (statement->selectList->at(0)->type == hsql::kExprStar)) {
-        for (const auto col: table.get_column_names()){
+        for (const auto col: all_column_names){
             column_names->push_back(col);
         }
     } else {
         for (hsql::Expr* col: *statement->selectList) {
-            cout << col->name << endl;
             column_names->push_back(Identifier(col->name));
         }
         column_attributes = table.get_column_attributes(*column_names);
@@ -373,6 +374,7 @@ QueryResult *SQLExec::create_index(const CreateStatement *statement) {
     row["is_unique"] = Value(string(statement->indexType) == "BTREE"); // assume HASH is non-unique --
     int seq = 0;
     Handles i_handles;
+    
     try {
         for (auto const &col_name: *statement->indexColumns) {
             row["seq_in_index"] = Value(++seq);
@@ -381,7 +383,13 @@ QueryResult *SQLExec::create_index(const CreateStatement *statement) {
         }
 
         DbIndex &index = SQLExec::indices->get_index(table_name, index_name);
-        index.create();
+        try {
+            index.create();
+        } catch (exception& e) {
+            index.drop();
+            throw;  // re-throw the original exception (which should give the client some clue as to why it did
+            
+        }
 
     } catch (...) {
         // attempt to remove from _indices
@@ -685,10 +693,12 @@ bool SQLExec::checkIfIndexExists(const char* tableName, const char* indexName) {
  * @return              map of column and values to match for.
  */
 ValueDict *SQLExec::get_where_conjunction(const hsql::Expr *expr, const ColumnNames *col_names) {
+    // check if there is no where statement, if so just return a null
     if (expr == nullptr) {
         return nullptr;
     }
 
+    // throw error if unsupported operator (conjunction type) is passed 
     if(expr->type != hsql::kExprOperator) {
         throw DbRelationError("Unsupported operator passed!");
     }
@@ -706,16 +716,16 @@ ValueDict *SQLExec::get_where_conjunction(const hsql::Expr *expr, const ColumnNa
         }
         Identifier col = expr->expr->name;
         if(find(col_names->begin(), col_names->end(), col) == col_names->end()){
-            throw DbRelationError("unknown column '" + col + "'");
+            throw DbRelationError("unknown column '" + col + "' in where statement");
         }
-        if(expr->expr2->type == kExprLiteralString) {
+        if(expr->expr2->type == hsql::kExprLiteralString) {
             rows->insert(pair<Identifier, Value>(col, Value(expr->expr2->name)));
         }
-        else if(expr->expr2->type == kExprLiteralInt) {
+        else if(expr->expr2->type == hsql::kExprLiteralInt) {
             rows->insert(pair<Identifier, Value>(col, Value(expr->expr2->ival)));
         }
         else {
-            throw DbRelationError("Type is not supported");
+            throw DbRelationError("Value in where comparison is not supported");
         }
     } else {
         throw DbRelationError("only supports AND conjunctions");
