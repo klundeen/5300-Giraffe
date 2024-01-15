@@ -11,6 +11,10 @@ using namespace hsql;
 
 const unsigned int BLOCK_SZ = 4096;
 
+/**
+ * Initializes the database environment.
+ * @param envdir Directory path for the database environment.
+ */
 void initializeDbEnv(string envdir)
 {
     // setup the database environment

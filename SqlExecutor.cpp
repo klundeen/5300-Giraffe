@@ -19,7 +19,7 @@ std::string SqlExecutor::execute(const SQLStatement *query)
     {
         return handleCreate((const CreateStatement *)query);
     }
-    return "other";
+    return "The only handled queries are `SELECT` and `CREATE TABLE`";
 }
 
 std::string SqlExecutor::handleSelect(const SelectStatement *selectStmt)
@@ -32,7 +32,7 @@ std::string SqlExecutor::handleSelect(const SelectStatement *selectStmt)
         ss << "DISTINCT ";
     }
 
-    // TODO:cols
+    // Select list
     size_t count = selectStmt->selectList->size();
     for (size_t i = 0; i < count; ++i)
     {
@@ -45,11 +45,12 @@ std::string SqlExecutor::handleSelect(const SelectStatement *selectStmt)
             ss << ", ";
         }
     }
-    // FROM clause
+
+    // FROM Clause
     ss << " FROM ";
     handleTableRef(selectStmt->fromTable, ss);
 
-    // WHERE
+    // WHERE Clause
     if (selectStmt->whereClause != NULL)
     {
         ss << " WHERE ";
@@ -189,11 +190,6 @@ void SqlExecutor::handleOperatorExpression(Expr *expr, std::stringstream &ss)
         handleExpression(expr->expr2, ss);
 }
 
-/**
- * Convert the hyrise ColumnDefinition AST back into the equivalent SQL
- * @param col  column definition to unparse
- * @return     SQL equivalent to *col
- */
 std::string SqlExecutor::columnDefinitionToString(const ColumnDefinition *col)
 {
     std::string ret(col->name);
