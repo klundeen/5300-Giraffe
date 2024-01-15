@@ -4,6 +4,7 @@
 #include <sstream>
 #include "db_cxx.h"
 #include "SQLParser.h"
+#include "SqlExecutor.h"
 
 using namespace std;
 using namespace hsql;
@@ -41,9 +42,12 @@ int main(void)
         }
 
         SQLParserResult *result = SQLParser::parseSQLString(userInput);
+
         if (result->isValid())
         {
-            cout << "Valid sql: " << userInput << endl;
+            SqlExecutor executor;
+            string parsedStatement = executor.execute(result->getStatement(0));
+            cout << parsedStatement << endl;
         }
         else
         {
