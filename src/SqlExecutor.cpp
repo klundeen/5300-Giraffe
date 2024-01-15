@@ -27,7 +27,56 @@ std::string SqlExecutor::execute(const SQLStatement *query)
     {
         return handleCreate((const CreateStatement *)query);
     }
+    else if (query->type() == kStmtInsert)
+    {
+        return handleInsert((const InsertStatement *)query);
+    }
     return "The only handled queries are `SELECT` and `CREATE TABLE`";
+}
+
+std::string SqlExecutor::handleInsert(const InsertStatement *inStmt)
+{
+    std::stringstream ss;
+    ss << "INSERT INTO " << inStmt->tableName << " ";
+    if (inStmt->columns != NULL)
+    {
+        ss << "(";
+        //  handle column list
+        size_t count = inStmt->columns->size();
+        for (size_t i = 0; i < count; ++i)
+        {
+            ss << inStmt->columns->at(i);
+
+            // Add a comma and space after each element except the last one
+            if (i < count - 1)
+            {
+                ss << ", ";
+            }
+        }
+        ss << ") ";
+    }
+    switch (inStmt->type)
+    {
+    case InsertStatement::kInsertValues:
+    {
+        ss << "VALUES (";
+        size_t exprCount = inStmt->values->size();
+        for (size_t i = 0; i < exprCount; ++i)
+        {
+            handleExpression(inStmt->values->at(i), ss);
+            if (i < exprCount - 1)
+            {
+                ss << ", ";
+            }
+        }
+        ss << ")";
+        break;
+    }
+    case InsertStatement::kInsertSelect:
+        ss << handleSelect(inStmt->select);
+        break;
+    }
+    return ss.str();
 }
 
 std::string SqlExecutor::handleSelect(const SelectStatement *selectStmt)
@@ -64,7 +113,6 @@ std::string SqlExecutor::handleSelect(const SelectStatement *selectStmt)
         ss << " WHERE ";
         handleExpression(selectStmt->whereClause, ss);
     }
-
     return ss.str();
 }
 

@@ -26,15 +26,19 @@ const unsigned int BLOCK_SZ = 4096;
  * Initializes the database environment.
  * @param envdir Directory path for the database environment.
  */
-void initializeDbEnv(string envdir)
+void initializeDbEnv(char* envdir)
 {
-    // setup the database environment
+    char *envHome = envdir;
+    cout << "(sql5300: running with database environment at " << envHome << ")" << endl;
     DbEnv env(0U);
     env.set_message_stream(&cout);
     env.set_error_stream(&cerr);
-    env.open(envdir.c_str(), DB_CREATE, 0);
-
-    printf("(sql5300: running with database environment at %s)\n", envdir.c_str());
+    try {
+        env.open(envHome, DB_CREATE | DB_INIT_MPOOL, 0);
+    } catch (DbException &exc) {
+        cerr << "(sql5300: " << exc.what() << ")";
+        exit(1);
+    }
 }
 
 int main(int argc, char *argv[])
@@ -45,33 +49,32 @@ int main(int argc, char *argv[])
         return 1; 
     }
 
-    string envdir = argv[1];
-
-    initializeDbEnv(envdir);
+    initializeDbEnv(argv[1]);
 
     string userInput;
     while (true)
     {
         cout << "SQL> ";
         getline(cin, userInput);
+        if (userInput.length() == 0)
+            continue;  // blank line -- just skip
         if (userInput == "quit")
         {
             break;
         }
 
         SQLParserResult *result = SQLParser::parseSQLString(userInput);
-
-        if (result->isValid())
-        {
-            SqlExecutor executor;
-            string parsedStatement = executor.execute(result->getStatement(0));
-            cout << parsedStatement << endl;
+        if (!result->isValid()) {
+            cout << "invalid SQL: " << userInput << endl;
+	    	delete result;
+            continue;
         }
-        else
-        {
-            cout << "Invalid SQL: " << userInput << endl;
+        SqlExecutor executor;
+        // execute the statement
+        for (uint i = 0; i < result->size(); ++i) {
+            cout << executor.execute(result->getStatement(i)) << endl;
         }
-        delete result;
+		delete result;
     }
 
     return EXIT_SUCCESS;

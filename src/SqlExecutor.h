@@ -1,6 +1,6 @@
 /**
- * The SqlExecutor class in this header file is designed to "execute" SQLStatement objects, 
- * mainly focusing on 'SELECT' and 'CREATE TABLE' queries. It interprets these statements, 
+ * The SqlExecutor class in this header file is designed to "execute" SQLStatement objects,
+ * mainly focusing on 'SELECT' and 'CREATE TABLE' queries. It interprets these statements,
  * constructing their SQL string representations and simulating SQL query execution.
  */
 
@@ -35,6 +35,13 @@ private:
      * @return A string representation of the CREATE query.
      */
     std::string handleCreate(const CreateStatement *createStmt);
+
+    /**
+     * Handles the INSERT statement.
+     * @param inStmt Pointer to the InsertStatement to be handled.
+     * @return A string representation of the INSERT query.
+     */
+    std::string handleInsert(const InsertStatement *inStmt);
 
     /**
      * Processes a TableRef and appends the corresponding SQL to the stringstream.
