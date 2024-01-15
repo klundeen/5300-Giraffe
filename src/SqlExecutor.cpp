@@ -1,3 +1,11 @@
+/**
+ * Implementation of the SqlExecutor class defined in SqlExecutor.h.
+ * This source file contains the logic for executing SQL statements,
+ * specifically focusing on 'SELECT' and 'CREATE TABLE' queries. It
+ * details how these statements are parsed and transformed into string
+ * representations to simulate SQL queries execution.
+ */
+
 #include "SqlExecutor.h"
 #include "SQLParser.h"
 #include <string>
