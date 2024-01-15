@@ -51,7 +51,7 @@ int main(void)
         }
         else
         {
-            cout << "Invalid sql: " << userInput << endl;
+            cout << "Invalid SQL: " << userInput << endl;
         }
         delete result;
     }

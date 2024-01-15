@@ -33,18 +33,27 @@ std::string SqlExecutor::handleSelect(const SelectStatement *selectStmt)
     }
 
     // TODO:cols
-
-    // FROM clause
-    if (selectStmt->fromTable)
+    size_t count = selectStmt->selectList->size();
+    for (size_t i = 0; i < count; ++i)
     {
-        ss << " FROM " << selectStmt->fromTable->name; 
+        hsql::Expr *expr = selectStmt->selectList->at(i);
+        handleExpression(expr, ss);
+
+        // Add a comma and space after each element except the last one
+        if (i < count - 1)
+        {
+            ss << ", ";
+        }
     }
+    // FROM clause
+    ss << " FROM ";
+    handleTableRef(selectStmt->fromTable, ss);
 
-    if (selectStmt->fromTable && selectStmt->fromTable->join)
+    // WHERE
+    if (selectStmt->whereClause != NULL)
     {
-        const JoinDefinition *join = selectStmt->fromTable->join;
-        ss << " LEFT JOIN " << join->right->name;
-        ss << " ON " << join->condition->expr->name << " = " << join->condition->expr2->name;
+        ss << " WHERE ";
+        handleExpression(selectStmt->whereClause, ss);
     }
 
     return ss.str();
@@ -53,7 +62,7 @@ std::string SqlExecutor::handleSelect(const SelectStatement *selectStmt)
 std::string SqlExecutor::handleCreate(const CreateStatement *createStmt)
 {
     std::stringstream ss;
-    ss << "CREATE TABLE " << createStmt->tableName << "(";
+    ss << "CREATE TABLE " << createStmt->tableName << " (";
     size_t numColumns = createStmt->columns->size();
     for (size_t i = 0; i < numColumns; ++i)
     {
@@ -70,43 +79,115 @@ std::string SqlExecutor::handleCreate(const CreateStatement *createStmt)
     return ss.str();
 }
 
-//  void printExpression(Expr* expr, std::stringstream& ss) {
-// switch (expr->type) {
-// case kExprStar:
-//     ss << "*";
-//     break;
-// case kExprColumnRef:
-//     if (expr->hasTable()) {
-//         ss << expr->table << ".";
-//     }
-//     ss << expr->name;
-//     break;
-// // case kExprTableColumnRef: inprint(expr->table, expr->name, numIndent); break;
-// case kExprLiteralFloat:
-//   inprint(expr->fval, numIndent);
-//   break;
-// case kExprLiteralInt:
-//   inprint(expr->ival, numIndent);
-//   break;
-// case kExprLiteralString:
-//   inprint(expr->name, numIndent);
-//   break;
-// case kExprFunctionRef:
-//   inprint(expr->name, numIndent);
-//   inprint(expr->expr->name, numIndent + 1);
-//   break;
-// case kExprOperator:
-//   printOperatorExpression(expr, numIndent);
-//   break;
-// default:
-//   fprintf(stderr, "Unrecognized expression type %d\n", expr->type);
-//   return;
-// }
-// if (expr->alias != NULL) {
-//   inprint("Alias", numIndent + 1);
-//   inprint(expr->alias, numIndent + 2);
-// }
-//   }
+void SqlExecutor::handleTableRef(TableRef *table, std::stringstream &ss)
+{
+    switch (table->type)
+    {
+    case kTableName:
+        ss << table->name;
+        break;
+    case kTableJoin:
+        handleTableRef(table->join->left, ss);
+
+        if (table->join->type == hsql::kJoinLeft)
+        {
+            ss << " LEFT";
+        }
+        else if (table->join->type == hsql::kJoinRight)
+        {
+            ss << " RIGHT";
+        }
+        ss << " JOIN ";
+
+        handleTableRef(table->join->right, ss);
+
+        ss << " ON ";
+
+        handleExpression(table->join->condition, ss);
+        break;
+    case kTableCrossProduct:
+        size_t count = table->list->size();
+        for (size_t i = 0; i < count; ++i)
+        {
+            TableRef *tbl = table->list->at(i);
+            handleTableRef(tbl, ss);
+
+            if (i < count - 1)
+            {
+                ss << ", ";
+            }
+        }
+        break;
+    }
+    if (table->alias != NULL)
+    {
+        ss << " AS " << table->alias;
+    }
+}
+
+void SqlExecutor::handleExpression(Expr *expr, std::stringstream &ss)
+{
+    switch (expr->type)
+    {
+    case kExprStar:
+        ss << "*";
+        break;
+    case kExprColumnRef:
+        ss << (expr->hasTable() ? std::string(expr->table) + "." : "") << expr->name;
+        break;
+    case kExprLiteralFloat:
+        ss << expr->fval;
+        break;
+    case kExprLiteralInt:
+        ss << expr->ival;
+        break;
+    case kExprLiteralString:
+        ss << expr->name;
+        break;
+
+    case kExprOperator:
+        handleOperatorExpression(expr, ss);
+        break;
+    default:
+        fprintf(stderr, "Unrecognized expression type %d\n", expr->type);
+        return;
+    }
+    if (expr->alias != NULL)
+    {
+        ss << " AS " << expr->alias;
+    }
+}
+
+void SqlExecutor::handleOperatorExpression(Expr *expr, std::stringstream &ss)
+{
+    handleExpression(expr->expr, ss);
+    if (expr == NULL)
+    {
+        ss << "null";
+        return;
+    }
+
+    switch (expr->opType)
+    {
+    case Expr::SIMPLE_OP:
+        ss << " " << expr->opChar << " ";
+        break;
+    case Expr::AND:
+        ss << " AND ";
+        break;
+    case Expr::OR:
+        ss << " OR ";
+        break;
+    case Expr::NOT:
+        ss << " NOT ";
+        break;
+    default:
+        ss << " " << expr->opType << " ";
+        break;
+    }
+    if (expr->expr2 != NULL)
+        handleExpression(expr->expr2, ss);
+}
 
 /**
  * Convert the hyrise ColumnDefinition AST back into the equivalent SQL
