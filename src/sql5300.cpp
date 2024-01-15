@@ -1,3 +1,14 @@
+/**
+ * @file sql5300.cpp
+ * 
+ * This program is the main application for Milestone 1: Skeleton in Sprint: Verano
+ * The code sets up an environment and runs a SQL shell emulator. 
+ * Users can write SQL commands which are then parsed and "executed". 
+ * The program runs interactively until the user issues a quit command.
+ * This code use Berkeley DB and sql-parser libraries 
+ * Author: Noha Nomier,  CPSC5300 WQ2024
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

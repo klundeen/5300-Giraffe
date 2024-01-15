@@ -1,3 +1,9 @@
+/**
+ * The SqlExecutor class in this header file is designed to "execute" SQLStatement objects, 
+ * mainly focusing on 'SELECT' and 'CREATE TABLE' queries. It interprets these statements, 
+ * constructing their SQL string representations and simulating SQL query execution.
+ */
+
 #include "SQLParser.h"
 #include "string.h"
 
