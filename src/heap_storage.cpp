@@ -2,6 +2,8 @@
 
 typedef u_int16_t u16;
 
+//------------------------SlottedPage----------------------------------------------
+
 SlottedPage::SlottedPage(Dbt &block, BlockID block_id, bool is_new) : DbBlock(block, block_id, is_new)
 {
     if (is_new)
@@ -42,7 +44,6 @@ Dbt *SlottedPage::get(RecordID record_id)
     return new Dbt(address(loc), size);
 }
 
-// FIX ME
 void SlottedPage::put(RecordID record_id, const Dbt &data)
 {
     u16 size, loc;
@@ -54,8 +55,9 @@ void SlottedPage::put(RecordID record_id, const Dbt &data)
         extra = new_size - size;
         if (!has_room(extra))
             throw DbBlockNoRoomError("not enough room for new record");
+        // need to shift records to make room for new data
         slide(loc, loc - new_size);
-        memcpy(this->address(loc - extra), data.get_data(), new_size);
+        memcpy(this->address(loc - new_size), data.get_data(), new_size);
     }
     else
     {
@@ -111,7 +113,6 @@ void SlottedPage::slide(u16 start, u16 end)
     if (shift == 0)
         return;
 
-    // slide data
     memcpy(this->address(this->end_free + shift + 1), address(this->end_free + 1), shift);
 
     RecordIDs *ids = this->ids();
@@ -159,31 +160,39 @@ void SlottedPage::put_header(RecordID id, u16 size, u16 loc)
     put_n(4 * id + 2, loc);
 }
 
-// HeapFile Method Implementations
-
-HeapFile::HeapFile(std::string name) : DbFile(name), last(0), closed(true), db(_DB_ENV, 0)
-{
-    // Empty constructor
-}
+//------------------------HeapFile----------------------------------------------
 
 void HeapFile::create(void)
 {
-    // Empty implementation
+    this->db_open(DB_CREATE | DB_EXCL);
+    SlottedPage *blockPage = this->get_new();
+    delete blockPage; // FIXME?
 }
 
+// FIXME
 void HeapFile::drop(void)
 {
-    // Empty implementation
+    this->close();
 }
 
 void HeapFile::open(void)
 {
-    // Empty implementation
+    this->db_open();
+}
+
+// FIXME
+void HeapFile::db_open(uint flags)
+{
+    if (closed == false)
+        return; // no need to do anything
+
+    this->closed = false;
 }
 
 void HeapFile::close(void)
 {
-    // Empty implementation
+    this->db.close(0);
+    this->closed = true;
 }
 
 // Allocate a new block for the database file.
@@ -206,57 +215,66 @@ SlottedPage *HeapFile::get_new(void)
 
 SlottedPage *HeapFile::get(BlockID block_id)
 {
-    // Empty implementation
-    return nullptr; // Placeholder return value
+    Dbt key(&block_id, sizeof(block_id));
+    Dbt data;
+    this->db.get(nullptr, &key, &data, 0);
+    return new SlottedPage(data, block_id, false);
 }
 
 void HeapFile::put(DbBlock *block)
 {
-    // Empty implementation
+    int block_id = block->get_block_id();
+    Dbt key(&block_id, sizeof(block_id));
+    this->db.put(nullptr, &key, block->get_block(), DB_APPEND); // txnid is null
 }
 
 BlockIDs *HeapFile::block_ids()
 {
-    // Empty implementation
-    return nullptr; // Placeholder return value
+    BlockIDs *blockIds = new BlockIDs;
+    for (BlockID i = 1; i <= (BlockID)this->last; i++)
+    {
+        blockIds->push_back(i);
+    }
+    return blockIds;
 }
 
-void HeapFile::db_open(uint flags)
-{
-    // Empty implementation
-}
-
-// HeapTable Method Implementations
-
+//------------------------HeapTable----------------------------------------------
 HeapTable::HeapTable(Identifier table_name, ColumnNames column_names, ColumnAttributes column_attributes)
-    : DbRelation(table_name, column_names, column_attributes)
+    : DbRelation(table_name, column_names, column_attributes), // Initialize base class
+      file(table_name)                                         // Initialize member variable file
 {
-    // Empty constructor
 }
 
 void HeapTable::create()
 {
-    // Empty implementation
+    this->file.create();
 }
 
 void HeapTable::create_if_not_exists()
 {
-    // Empty implementation
+    try
+    {
+        this->open();
+    }
+    catch (Exception &e) // FIXME
+    {
+        this->create();
+    }
 }
 
 void HeapTable::drop()
 {
-    // Empty implementation
+    this->file.drop();
 }
 
 void HeapTable::open()
 {
-    // Empty implementation
+    this->file.open();
 }
 
 void HeapTable::close()
 {
-    // Empty implementation
+    this->file.close();
 }
 
 Handle HeapTable::insert(const ValueDict *row)
