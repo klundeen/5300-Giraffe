@@ -166,15 +166,17 @@ void HeapFile::create(void)
 {
     this->db_open(DB_CREATE | DB_EXCL);
     SlottedPage *blockPage = this->get_new();
-    delete blockPage; // FIXME?
+    this->put(blockPage);
 }
 
 // FIXME
 void HeapFile::drop(void)
 {
     this->close();
+    std::remove(this->dbfilename.c_str());
 }
 
+// FIXME
 void HeapFile::open(void)
 {
     this->db_open();
@@ -185,6 +187,13 @@ void HeapFile::db_open(uint flags)
 {
     if (closed == false)
         return; // no need to do anything
+
+    this->db.set_re_len(BLOCK_SZ);
+    this->dbfilename = this->name + ".db";
+    db.open(nullptr, this->dbfilename, nullptr, DB_RECNO, flags, 0644); // RECNO is a record number database, 0644 is unix file permission
+    DB_BTREE_STAT stat;
+    this->db.stat(nullptr, &stat, DB_FAST_STAT);
+    this->last = stat.bt_ndata;
 
     this->closed = false;
 }
