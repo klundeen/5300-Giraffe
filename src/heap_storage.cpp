@@ -1,4 +1,7 @@
 #include "heap_storage.h"
+#include "storage_engine.h"
+#include <cstring>  
+
 
 typedef u_int16_t u16;
 
@@ -73,7 +76,7 @@ void SlottedPage::del(RecordID record_id)
     // Empty implementation
     u16 size, loc;
     get_header(size, loc, record_id);
-    put_header(id, 0, 0);
+    put_header(record_id, 0, 0);
     slide(loc, loc + size);
 }
 
@@ -93,7 +96,7 @@ RecordIDs *SlottedPage::ids(void)
     return ids;
 }
 
-void SlottedPage::get_header(u16 &size, u16 &loc, RecordID id = 0)
+void SlottedPage::get_header(u16 &size, u16 &loc, RecordID id)
 {
     if (id > num_records)
         throw("Record id is not valid: " + id);
@@ -188,9 +191,9 @@ void HeapFile::db_open(uint flags)
     if (closed == false)
         return; // no need to do anything
 
-    this->db.set_re_len(BLOCK_SZ);
+    this->db.set_re_len(DbBlock::BLOCK_SZ);
     this->dbfilename = this->name + ".db";
-    db.open(nullptr, this->dbfilename, nullptr, DB_RECNO, flags, 0644); // RECNO is a record number database, 0644 is unix file permission
+    db.open(nullptr, this->dbfilename.c_str(), nullptr, DB_RECNO, flags, 0644); // RECNO is a record number database, 0644 is unix file permission
     DB_BTREE_STAT stat;
     this->db.stat(nullptr, &stat, DB_FAST_STAT);
     this->last = stat.bt_ndata;
@@ -265,7 +268,7 @@ void HeapTable::create_if_not_exists()
     {
         this->open();
     }
-    catch (Exception &e) // FIXME
+    catch (const DbException& e) // FIXME
     {
         this->create();
     }
