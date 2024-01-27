@@ -72,7 +72,6 @@ void SlottedPage::put(RecordID record_id, const Dbt &data)
 
 void SlottedPage::del(RecordID record_id)
 {
-    // Empty implementation
     u16 size, loc;
     get_header(size, loc, record_id);
     put_header(record_id, 0, 0);
@@ -499,6 +498,13 @@ bool test_heap_storage()
     std::cout << "try insert" << std::endl;
     table.insert(&row);
     std::cout << "insert ok" << std::endl;
+
+    // ValueDict row2;
+    // row2["a"] = Value(13);
+    // row2["b"] = Value("Hello2!");
+    // std::cout << "try insert" << std::endl;
+    // table.insert(&row2);
+    // std::cout << "insertw ok" << std::endl;
 
     std::cout << "------ Select --------- " << std::endl;
 
