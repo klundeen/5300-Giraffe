@@ -72,11 +72,11 @@ int main(int argc, char *argv[])
             break;
         }
 
-        // if (query == "test")
-        // {
-        //     cout << "test_heap_storage: " << (test_heap_storage() ? "ok" : "failed") << endl;
-        //     continue;
-        // }
+        if (userInput == "test")
+        {
+            cout << "test_heap_storage: " << (test_heap_storage() ? "ok" : "failed") << endl;
+            continue;
+        }
 
         SQLParserResult *result = SQLParser::parseSQLString(userInput);
         if (!result->isValid())

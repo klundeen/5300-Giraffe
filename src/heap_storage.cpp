@@ -1,7 +1,6 @@
 #include "heap_storage.h"
 #include "storage_engine.h"
-#include <cstring>  
-
+#include <cstring>
 
 typedef u_int16_t u16;
 
@@ -268,7 +267,7 @@ void HeapTable::create_if_not_exists()
     {
         this->open();
     }
-    catch (const DbException& e) // FIXME
+    catch (const DbException &e) // FIXME
     {
         this->create();
     }
@@ -291,24 +290,35 @@ void HeapTable::close()
 
 Handle HeapTable::insert(const ValueDict *row)
 {
-    // Empty implementation
-    return Handle(); // Placeholder return value
+    this->open();
+    return this->append(this->validate(row));
 }
 
 void HeapTable::update(const Handle handle, const ValueDict *new_values)
 {
-    // Empty implementation
+    // FIXME
 }
 
 void HeapTable::del(const Handle handle)
 {
-    // Empty implementation
+    // FIXME
 }
 
 Handles *HeapTable::select()
 {
-    // Empty implementation
-    return nullptr; // Placeholder return value
+    Handles *handles = new Handles();
+    BlockIDs *block_ids = file.block_ids();
+    for (auto const &block_id : *block_ids)
+    {
+        SlottedPage *block = file.get(block_id);
+        RecordIDs *record_ids = block->ids();
+        for (auto const &record_id : *record_ids)
+            handles->push_back(Handle(block_id, record_id));
+        delete record_ids;
+        delete block;
+    }
+    delete block_ids;
+    return handles;
 }
 
 Handles *HeapTable::select(const ValueDict *where)
@@ -336,20 +346,65 @@ ValueDict *HeapTable::project(Handle handle)
 
 ValueDict *HeapTable::project(Handle handle, const ColumnNames *column_names)
 {
-    // Empty implementation
-    return nullptr; // Placeholder return value
+    BlockID blockID = handle.first;
+    RecordID recordID = handle.second;
+    SlottedPage *block = this->file.get(blockID);
+    Dbt *data = block->get(recordID);
+    ValueDict *rows = unmarshal(data);
+    if (column_names == nullptr || column_names->empty())
+        return rows;
+
+    // Create a new ValueDict for the filtered columns.
+    ValueDict *filteredRows = new ValueDict;
+    for (const auto &colName : *column_names)
+    {
+        auto it = rows->find(colName);
+        if (it != rows->end())
+        {
+            (*filteredRows)[colName] = it->second;
+        }
+    }
+    delete rows;
+    delete block;
+    delete data;
+    return filteredRows;
 }
 
 ValueDict *HeapTable::validate(const ValueDict *row)
 {
-    // Empty implementation
-    return nullptr; // Placeholder return value
+    ValueDict *fullRow = new ValueDict();
+
+    for (const auto &column_name : this->column_names)
+    {
+        auto it = row->find(column_name);
+
+        // Check if the column name exists in the input row
+        if (it == row->end())
+        {
+            delete fullRow;
+            throw DbRelationError("Column '" + column_name + "' is missing in the row.");
+        }
+        (*fullRow)[column_name] = it->second;
+    }
+    return fullRow;
 }
 
 Handle HeapTable::append(const ValueDict *row)
 {
-    // Empty implementation
-    return Handle(); // Placeholder return value
+    Dbt *data = marshal(row);
+    SlottedPage *block = this->file.get(this->file.get_last_block_id());
+    RecordID id;
+    try
+    {
+        id = block->add(data);
+    }
+    catch (DbRelationError const &)
+    {
+        block = this->file.get_new();
+        id = block->add(data);
+    }
+    this->file.put(block);
+    return Handle(this->file.get_last_block_id(), id);
 }
 
 // return the bits to go into the file
@@ -391,12 +446,78 @@ Dbt *HeapTable::marshal(const ValueDict *row)
 
 ValueDict *HeapTable::unmarshal(Dbt *data)
 {
-    // Empty implementation
-    return nullptr; // Placeholder return value
+    char *bytes = static_cast<char *>(data->get_data());
+    uint offset = 0;
+    uint col_num = 0;
+
+    ValueDict *row = new ValueDict();
+    for (auto const &column_name : this->column_names)
+    {
+        ColumnAttribute ca = this->column_attributes[col_num++];
+
+        if (ca.get_data_type() == ColumnAttribute::DataType::INT)
+        {
+            // Read an integer value
+            int32_t value = *(reinterpret_cast<int32_t *>(bytes + offset));
+            offset += sizeof(int32_t);
+            (*row)[column_name] = Value(value);
+        }
+        else if (ca.get_data_type() == ColumnAttribute::DataType::TEXT)
+        {
+            u16 size = *(reinterpret_cast<u16 *>(bytes + offset));
+            offset += sizeof(u16);
+            std::string value(bytes + offset, size);
+            offset += size;
+            (*row)[column_name] = Value(value);
+        }
+        else
+        {
+            delete row;
+            throw DbRelationError("Unsupported data type found");
+        }
+    }
+    delete[] bytes;
+    return row;
 }
 
-bool test_heap_storage()
-{
-    // Empty implementation
-    return false; // Placeholder return value
+// test function -- returns true if all tests pass
+bool test_heap_storage() {
+	ColumnNames column_names;
+	column_names.push_back("a");
+	column_names.push_back("b");
+	ColumnAttributes column_attributes;
+	ColumnAttribute ca(ColumnAttribute::INT);
+	column_attributes.push_back(ca);
+	ca.set_data_type(ColumnAttribute::TEXT);
+	column_attributes.push_back(ca);
+    HeapTable table1("_test_create_drop_cpp", column_names, column_attributes);
+    // table1.create();
+    // std::cout << "create ok" << std::endl;
+    // table1.drop();  // drop makes the object unusable because of BerkeleyDB restriction -- maybe want to fix this some day
+    // std::cout << "drop ok" << std::endl;
+
+    // HeapTable table("_test_data_cpp", column_names, column_attributes);
+    // table.create_if_not_exists();
+    // std::cout << "create_if_not_exsts ok" << std::endl;
+
+    // ValueDict row;
+    // row["a"] = Value(12);
+    // row["b"] = Value("Hello!");
+    // std::cout << "try insert" << std::endl;
+    // table.insert(&row);
+    // std::cout << "insert ok" << std::endl;
+    // Handles* handles = table.select();
+    // std::cout << "select ok " << handles->size() << std::endl;
+    // ValueDict *result = table.project((*handles)[0]);
+    // std::cout << "project ok" << std::endl;
+    // Value value = (*result)["a"];
+    // if (value.n != 12)
+    // 	return false;
+    // value = (*result)["b"];
+    // if (value.s != "Hello!")
+	// 	return false;
+    // table.drop();
+
+    return true;
 }
+
