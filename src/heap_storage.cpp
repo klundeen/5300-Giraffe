@@ -16,8 +16,8 @@ SlottedPage::SlottedPage(Dbt &block, BlockID block_id, bool is_new) : DbBlock(bl
     }
     else
     {
-        get_header(this->num_records, this->end_free);
-    }
+                get_header(this->num_records, this->end_free);
+            }
 }
 
 // Add a new record to the block. Return its id.
@@ -32,7 +32,7 @@ RecordID SlottedPage::add(const Dbt *data)
     put_header();
     put_header(id, size, loc);
     memcpy(this->address(loc), data->get_data(), size);
-    return id;
+        return id;
 }
 
 Dbt *SlottedPage::get(RecordID record_id)
@@ -58,12 +58,13 @@ void SlottedPage::put(RecordID record_id, const Dbt &data)
         if (!has_room(extra))
             throw DbBlockNoRoomError("not enough room for new record");
         // need to shift records to make room for new data
-        slide(loc, loc - new_size);
-        memcpy(this->address(loc - new_size), data.get_data(), new_size);
+        slide(loc, loc - extra);
+        memcpy(this->address(loc - extra), data.get_data(), new_size);
     }
     else
     {
         memcpy(this->address(loc), data.get_data(), new_size);
+        slide(loc + new_size, loc + size);
     }
 
     put_header();
@@ -114,7 +115,7 @@ void SlottedPage::slide(u16 start, u16 end)
     if (shift == 0)
         return;
 
-    memcpy(this->address(this->end_free + shift + 1), address(this->end_free + 1), shift);
+    memmove(this->address(this->end_free + shift + 1), address(this->end_free + 1), shift);
 
     RecordIDs *ids = this->ids();
     for (RecordID &id : *ids)
@@ -148,20 +149,20 @@ void *SlottedPage::address(u16 offset)
 {
     void *addr = (void *)((char *)this->block.get_data() + offset);
     // std::cout << "block data address: " << this->block.get_data()
-    //           << ", offset: " << offset
-    //           << ", calculated address: " << addr << std::endl;
+              //           << ", offset: " << offset
+              //           << ", calculated address: " << addr << std::endl;
     return addr;
 }
 
 // Store the size and offset for given id. For id of zero, store the block header.
 void SlottedPage::put_header(RecordID id, u16 size, u16 loc)
-{
+{   
     if (id == 0)
     { // called the put_header() version and using the default params
         size = this->num_records;
         loc = this->end_free;
     }
-    put_n((u16)4 * id, size);
+        put_n((u16)4 * id, size);
     put_n((u16)4 * id + 2, loc);
 }
 
@@ -320,7 +321,7 @@ Handles *HeapTable::select(const ValueDict *where)
     BlockIDs *block_ids = file.block_ids();
     for (auto const &block_id : *block_ids)
     {
-        SlottedPage *block = file.get(block_id);
+                SlottedPage *block = file.get(block_id);
         RecordIDs *record_ids = block->ids();
         for (auto const &record_id : *record_ids)
             handles->push_back(Handle(block_id, record_id));
@@ -392,10 +393,13 @@ Handle HeapTable::append(const ValueDict *row)
     }
     catch (DbRelationError const &)
     {
-        block = this->file.get_new();
+                block = this->file.get_new();
         id = block->add(data);
     }
     this->file.put(block);
+    delete block;
+    delete[] (char *) data->get_data();
+    delete data;
     return Handle(this->file.get_last_block_id(), id);
 }
 
@@ -490,7 +494,7 @@ bool test_heap_storage()
 
     HeapTable table("_test_data_cpp", column_names, column_attributes);
     table.create_if_not_exists();
-    std::cout << "create_if_not_exsts ok" << std::endl;
+    std::cout << "create_if_not_exists ok" << std::endl;
 
     ValueDict row;
     row["a"] = Value(12);
@@ -506,26 +510,26 @@ bool test_heap_storage()
     // table.insert(&row2);
     // std::cout << "insertw ok" << std::endl;
 
-    std::cout << "------ Select --------- " << std::endl;
+    // std::cout << "------ Select --------- " << std::endl;
 
     Handles *handles = table.select();
     std::cout << "select ok " << handles->size() << std::endl;
-    ValueDict *result = table.project((*handles)[0]);
+ValueDict *result = table.project((*handles)[0]);
     std::cout << "project ok" << std::endl;
     if (result == nullptr)
     {
         std::cerr << "Project returned null." << std::endl;
-        return false;
+    return false;
     }
     Value value = (*result)["a"];
     if (value.n != 12)
     {
         std::cout << "failed here because value.n " << value.n << std::endl;
-        return false;
+    return false;
     }
     value = (*result)["b"];
     if (value.s != "Hello!")
-        return false;
+    return false;
     table.drop();
     return true;
 }
