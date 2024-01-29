@@ -62,6 +62,9 @@ int main(int argc, char *argv[])
         {
             cout << "test_heap_storage: " << (test_heap_storage() ? "ok" : "failed") << endl;
             continue;
+        } else if (userInput == "slotted") {
+            cout << "test_slotted_page: " << (test_slotted_page() ? "ok" : "failed") << endl;
+            continue;
         }
 
         SQLParserResult *result = SQLParser::parseSQLString(userInput);

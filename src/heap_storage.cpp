@@ -115,7 +115,7 @@ void SlottedPage::slide(u16 start, u16 end)
     if (shift == 0)
         return;
 
-    memmove(this->address(this->end_free + shift + 1), address(this->end_free + 1), shift);
+    memmove(this->address(this->end_free + shift + 1), address(this->end_free + 1), start - (this->end_free + 1));
 
     RecordIDs *ids = this->ids();
     for (RecordID &id : *ids)
@@ -180,7 +180,6 @@ void HeapFile::create(void)
 void HeapFile::drop(void)
 {
     this->close();
-    // Db db(_DB_ENV, 0);
     // db.remove((this->dbfilename+".db").c_str(), nullptr, 0);
     std::remove(this->dbfilename.c_str());
 }
@@ -524,4 +523,68 @@ bool test_heap_storage()
         return false;
     table.drop();
     return true;
+}
+
+bool test_slotted_page()
+{
+    try
+    {
+        // create empty data block of the block size
+        char block[DbBlock::BLOCK_SZ];
+        std::memset(block, 0, sizeof(block));
+        Dbt block_dbt(block, sizeof(block));
+        BlockID block_id = 1;
+        bool is_new = true;
+
+        // convert the block to a new slotted page
+        SlottedPage slottedPage(block_dbt, block_id, is_new);
+        // Add records
+        const char *data1 = "test1";
+        Dbt data1_dbt((void *)data1, std::strlen(data1) + 1);
+        RecordID id1 = slottedPage.add(&data1_dbt);
+
+        const char *data2 = "test2";
+        Dbt data2_dbt((void *)data2, std::strlen(data2) + 1);
+        RecordID id2 = slottedPage.add(&data2_dbt);
+
+        // validate data
+        Dbt *retrieved_data1 = slottedPage.get(id1);
+        if (std::strcmp((char *)retrieved_data1->get_data(), data1) != 0)
+        {
+            std::cerr << "Error: Failed to retrieve record 1 data" << std::endl;
+            return false;
+        }
+
+        std::cout << "SlottedPage::add(): retrieved record 1 successfully" << std::endl;
+        Dbt *retrieved_data2 = slottedPage.get(id2);
+        if (std::strcmp((char *)retrieved_data2->get_data(), data2) != 0)
+        {
+            std::cerr << "Error: Failed to retrieve record 2 data" << std::endl;
+            return false;
+        }
+        std::cout << "SlottedPage::add(): retrieved record 2 successfully" << std::endl;
+
+        // update a record with a larger size
+        const char *updatedData2 = "updated record 2";
+        Dbt updatedData2_dbt((void *)updatedData2, std::strlen(updatedData2) + 1);
+        slottedPage.put(id2, updatedData2_dbt);
+
+        // Delete a record (should become tombstone)
+        slottedPage.del(id1);
+
+        // Validate update
+        RecordIDs *ids = slottedPage.ids();
+        if (ids->size() != 1 || ids->at(0) != id2)
+        {
+            std::cerr << "Record deletion or update (put) failed" << std::endl;
+            return false;
+        }
+        std::cout << "SlottedPage test passed successfully." << std::endl;
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "SlottedPage test failed: " << e.what() << std::endl;
+        return false;
+    }
 }
