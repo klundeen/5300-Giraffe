@@ -5,7 +5,6 @@
 typedef u_int16_t u16;
 
 //------------------------SlottedPage----------------------------------------------
-
 SlottedPage::SlottedPage(Dbt &block, BlockID block_id, bool is_new) : DbBlock(block, block_id, is_new)
 {
     if (is_new)
@@ -106,7 +105,8 @@ void SlottedPage::get_header(u16 &size, u16 &loc, RecordID id)
 
 bool SlottedPage::has_room(u16 size)
 {
-    return size <= this->end_free - (this->num_records + 1) * 4;
+    u16 available = end_free - (num_records + 2) * 4;
+    return size <= available;
 }
 
 void SlottedPage::slide(u16 start, u16 end)
@@ -172,8 +172,6 @@ void HeapFile::create(void)
 {
     this->db_open(DB_CREATE | DB_EXCL);
     SlottedPage *blockPage = this->get_new();
-    this->put(blockPage);
-    delete blockPage;
 }
 
 // FIXME
@@ -184,13 +182,11 @@ void HeapFile::drop(void)
     std::remove(this->dbfilename.c_str());
 }
 
-// FIXME
 void HeapFile::open(void)
 {
     this->db_open();
 }
 
-// FIXME
 void HeapFile::db_open(uint flags)
 {
     if (closed == false)

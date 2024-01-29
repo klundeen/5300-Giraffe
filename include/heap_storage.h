@@ -85,7 +85,6 @@ public:
     HeapFile(std::string name) : DbFile(name), dbfilename(""), last(0), closed(true), db(_DB_ENV, 0) {}
 
     virtual ~HeapFile() {}
-
     HeapFile(const HeapFile &other) = delete;
 
     HeapFile(HeapFile &&temp) = delete;
