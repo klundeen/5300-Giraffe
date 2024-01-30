@@ -178,7 +178,7 @@ void HeapFile::create(void)
 void HeapFile::drop(void)
 {
     this->close();
-    // db.remove((this->dbfilename+".db").c_str(), nullptr, 0);
+    Db(_DB_ENV, 0).remove(this->dbfilename.c_str(), nullptr, 0);
     std::remove(this->dbfilename.c_str());
 }
 
@@ -204,6 +204,7 @@ void HeapFile::db_open(uint flags)
 
 void HeapFile::close(void)
 {
+    if(closed == true) return;
     this->db.close(0);
     this->closed = true;
 }
@@ -581,6 +582,49 @@ bool test_slotted_page()
     catch (const std::exception &e)
     {
         std::cerr << "SlottedPage test failed: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool test_heap_file() {
+    try {
+        HeapFile heapFile("_test_heap_file");
+        heapFile.create();
+        std::cout << "Created heap file" << std::endl;
+
+        // Open the heap file
+        heapFile.open();
+        std::cout << "Opened heap file" << std::endl;
+
+        if (heapFile.get_last_block_id() != 1) {
+            return false;
+        }
+
+        // Allocate a new block
+        SlottedPage* newBlock = heapFile.get_new();
+        if (newBlock && heapFile.get_last_block_id() == 2) {
+            std::cout << "Allocate new block passed." << std::endl;
+        } else {
+            std::cerr << "Failed to allocate new block." << std::endl;
+            return false;
+        }
+        
+        int blockId = newBlock->get_block_id();
+        delete newBlock;
+
+         SlottedPage* retrievedBlock = heapFile.get(blockId);
+        if(retrievedBlock == nullptr || retrievedBlock->get_block_id() != blockId) {
+            std::cerr << "Failed to retrieve block." << std::endl;
+        }
+        std::cout << "New Block retrieved successfully." << std::endl;
+
+        heapFile.drop();
+
+        std::cout << "HeapFile dropped." << std::endl;
+
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Test failed with exception: " << e.what() << std::endl;
         return false;
     }
 }
