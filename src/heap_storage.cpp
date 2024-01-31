@@ -5,6 +5,11 @@
 typedef u_int16_t u16;
 
 //------------------------SlottedPage----------------------------------------------
+
+// SlottedPage constructor to create a new block or load an existing one.
+// @param block: The data block from Berkeley DB.
+// @param block_id: The id of this block
+// @param is_new: Flag to indicate whether it's a new block or not
 SlottedPage::SlottedPage(Dbt &block, BlockID block_id, bool is_new) : DbBlock(block, block_id, is_new)
 {
     if (is_new)
@@ -34,6 +39,7 @@ RecordID SlottedPage::add(const Dbt *data)
     return id;
 }
 
+// Retrieves a record by its ID
 Dbt *SlottedPage::get(RecordID record_id)
 {
     u16 size, loc;
@@ -45,6 +51,9 @@ Dbt *SlottedPage::get(RecordID record_id)
     return new Dbt(address(loc), size);
 }
 
+// Updates a record with new data.
+// Needs to accomodate for different sizes by sliding the data
+// and adjusting memory and headers accordingly
 void SlottedPage::put(RecordID record_id, const Dbt &data)
 {
     u16 size, loc;
@@ -70,6 +79,7 @@ void SlottedPage::put(RecordID record_id, const Dbt &data)
     put_header(record_id, new_size, loc);
 }
 
+// Deletes a record by its ID.
 void SlottedPage::del(RecordID record_id)
 {
     u16 size, loc;
@@ -78,6 +88,7 @@ void SlottedPage::del(RecordID record_id)
     slide(loc, loc + size);
 }
 
+// Returns a list of IDs for all non-deleted (tombstone) records in the block.
 RecordIDs *SlottedPage::ids(void)
 {
     u16 size, loc;
@@ -94,6 +105,7 @@ RecordIDs *SlottedPage::ids(void)
     return ids;
 }
 
+// Retrieves the header information for a record.
 void SlottedPage::get_header(u16 &size, u16 &loc, RecordID id)
 {
     if (id > num_records)
@@ -103,12 +115,14 @@ void SlottedPage::get_header(u16 &size, u16 &loc, RecordID id)
     loc = get_n((4 * id) + 2);
 }
 
+// Checks if there is enough room for a record of a given size.
 bool SlottedPage::has_room(u16 size)
 {
     u16 available = end_free - (num_records + 2) * 4;
     return size <= available;
 }
 
+// Slides records in the block to make room for updated records.
 void SlottedPage::slide(u16 start, u16 end)
 {
     u16 shift = end - start;
@@ -148,9 +162,6 @@ void SlottedPage::put_n(u16 offset, u16 n)
 void *SlottedPage::address(u16 offset)
 {
     void *addr = (void *)((char *)this->block.get_data() + offset);
-    // std::cout << "block data address: " << this->block.get_data()
-    //           << ", offset: " << offset
-    //           << ", calculated address: " << addr << std::endl;
     return addr;
 }
 
@@ -168,13 +179,14 @@ void SlottedPage::put_header(RecordID id, u16 size, u16 loc)
 
 //------------------------HeapFile----------------------------------------------
 
+// Creates a new heap file by opening a database with exclusive creation.
 void HeapFile::create(void)
 {
     this->db_open(DB_CREATE | DB_EXCL);
     SlottedPage *blockPage = this->get_new();
 }
 
-// FIXME
+// Drops the heap file by closing and removing the database file.
 void HeapFile::drop(void)
 {
     this->close();
@@ -182,11 +194,13 @@ void HeapFile::drop(void)
     std::remove(this->dbfilename.c_str());
 }
 
+// Opens the heap file database.
 void HeapFile::open(void)
 {
     this->db_open();
 }
 
+// Internal function to open the database with the given flags.
 void HeapFile::db_open(uint flags)
 {
     if (closed == false)
@@ -202,6 +216,7 @@ void HeapFile::db_open(uint flags)
     this->closed = false;
 }
 
+// Closes the heap file database.
 void HeapFile::close(void)
 {
     if(closed == true) return;
@@ -227,6 +242,8 @@ SlottedPage *HeapFile::get_new(void)
     return page;
 }
 
+// Retrieves a block from the database by its ID and 
+// returns pointer to the SlottedPage representing the block.
 SlottedPage *HeapFile::get(BlockID block_id)
 {
     Dbt key(&block_id, sizeof(block_id));
@@ -235,6 +252,7 @@ SlottedPage *HeapFile::get(BlockID block_id)
     return new SlottedPage(data, block_id, false);
 }
 
+// Writes a block back to the database.
 void HeapFile::put(DbBlock *block)
 {
     int block_id = block->get_block_id();
@@ -242,6 +260,7 @@ void HeapFile::put(DbBlock *block)
     this->db.put(nullptr, &key, block->get_block(), 0); // txnid is null
 }
 
+// Returns a list of all block IDs in the heap file.
 BlockIDs *HeapFile::block_ids()
 {
     BlockIDs *blockIds = new BlockIDs;
@@ -253,17 +272,21 @@ BlockIDs *HeapFile::block_ids()
 }
 
 //------------------------HeapTable----------------------------------------------
+
+// Constructor for HeapTable, initializes the heap table with specified parameters.
 HeapTable::HeapTable(Identifier table_name, ColumnNames column_names, ColumnAttributes column_attributes)
     : DbRelation(table_name, column_names, column_attributes), // Initialize base class
       file(table_name)                                         // Initialize member variable file
 {
 }
 
+// Creates the table by creating the new file for it
 void HeapTable::create()
 {
     this->file.create();
 }
 
+// Creates a new heap file for the table if it does not already exist.
 void HeapTable::create_if_not_exists()
 {
     try
@@ -276,21 +299,26 @@ void HeapTable::create_if_not_exists()
     }
 }
 
+// Drops the heap file associated with the table.
 void HeapTable::drop()
 {
     this->file.drop();
 }
 
+// Opens the heap file associated with the table.
 void HeapTable::open()
 {
     this->file.open();
 }
 
+// Closes the heap file associated with the table.
 void HeapTable::close()
 {
     this->file.close();
 }
 
+// Inserts a new row into the table and returns 
+// a handle to the newly inserted row
 Handle HeapTable::insert(const ValueDict *row)
 {
     this->open();
@@ -307,11 +335,14 @@ void HeapTable::del(const Handle handle)
     // FIXME
 }
 
+// Selects all rows from the table.
+// @return A vector of handles to the selected rows.
 Handles *HeapTable::select()
 {
     return select(nullptr);
 }
 
+// Selects rows from the table based on a condition/predicate (where)
 Handles *HeapTable::select(const ValueDict *where)
 {
     Handles *handles = new Handles();
@@ -329,11 +360,13 @@ Handles *HeapTable::select(const ValueDict *where)
     return handles;
 }
 
+// Projects a row from the table.
 ValueDict *HeapTable::project(Handle handle)
 {
     return project(handle, &this->column_names);
 }
 
+// Projects a row from the table with specified columns.
 ValueDict *HeapTable::project(Handle handle, const ColumnNames *column_names)
 {
     BlockID blockID = handle.first;
@@ -360,6 +393,8 @@ ValueDict *HeapTable::project(Handle handle, const ColumnNames *column_names)
     return filteredRows;
 }
 
+// Validates a row against the table's schema to make sure the columns
+// actually exist
 ValueDict *HeapTable::validate(const ValueDict *row)
 {
     ValueDict *fullRow = new ValueDict();
@@ -379,6 +414,8 @@ ValueDict *HeapTable::validate(const ValueDict *row)
     return fullRow;
 }
 
+// Appends a row to the table after marshalling the data 
+// and adding it to the block
 Handle HeapTable::append(const ValueDict *row)
 {
     Dbt *data = marshal(row);
@@ -437,6 +474,8 @@ Dbt *HeapTable::marshal(const ValueDict *row)
     return data;
 }
 
+// Unmarshals a row from its stored format and
+// returns a dictionary representing the unmarshaled row.
 ValueDict *HeapTable::unmarshal(Dbt *data)
 {
     char *bytes = static_cast<char *>(data->get_data());

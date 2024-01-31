@@ -173,9 +173,13 @@ protected:
 
     virtual ValueDict *unmarshal(Dbt *data);
 };
-
+// Test function for heap storage, returns true if all tests pass.
 bool test_heap_storage();
+
+// Test function for SlottedPage, returns true if all tests pass.
 bool test_slotted_page();
+
+// Test function for HeapFile, returns true if all tests pass.
 bool test_heap_file();
 
 
