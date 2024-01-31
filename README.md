@@ -37,13 +37,38 @@ Upon running, you'll enter a SQL shell where you can interact with the database.
 
 ## Testing Heap Storage
 
-For Milestone 2 and testing the heap storage functionality, you have three options:
+For Milestone 2 and testing the heap storage functionality:
 
-1. **General Test**: Type `test` to run `test_heap_storage()`, which includes tests for `HeapFile`, `HeapTable`, and `SlottedPage`.
+Type `test` to run `test_heap_storage()`, which calls test functions for `HeapFile`, `HeapTable`, and `SlottedPage`.
 
-2. **Slotted Page Test**: Type `slotted` for a basic test of the `SlottedPage` functionality.
+**Sample Output:**
+```
+SQL> test
+test_heap_storage:
 
-3. **Heap File Test**: Type `heapfile` for a basic test of the `HeapFile` functionality.
+Testing SlottedPage....
+SlottedPage::add(): retrieved record 1 successfully
+SlottedPage::add(): retrieved record 2 successfully
+SlottedPage test passed successfully.
+
+Testing HeapFile....
+Created heap file
+Opened heap file
+Allocate new block passed.
+New Block retrieved successfully.
+HeapFile dropped.
+
+Testing HeapTable....
+create ok
+drop ok
+create_if_not_exists ok
+try insert
+insert ok
+select ok 1
+project ok
+Testing HeapTable Done
+ok
+```
 
 Alternatively, you can type a SQL query to "execute" it. Currently, execution primarily involves parsing the query and printing it back after parsing.
 

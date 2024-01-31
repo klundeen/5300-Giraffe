@@ -512,8 +512,9 @@ ValueDict *HeapTable::unmarshal(Dbt *data)
 }
 
 // test function -- returns true if all tests pass
-bool test_heap_storage()
+bool test_heap_table()
 {
+    std::cout<<"\nTesting HeapTable...."<<std::endl;
     ColumnNames column_names;
     column_names.push_back("a");
     column_names.push_back("b");
@@ -558,11 +559,14 @@ bool test_heap_storage()
     if (value.s != "Hello!")
         return false;
     table.drop();
+    std::cout<<"Testing HeapTable Done"<<std::endl;
     return true;
 }
 
 bool test_slotted_page()
 {
+    std::cout<<"\nTesting SlottedPage...."<<std::endl;
+
     try
     {
         // create empty data block of the block size
@@ -623,9 +627,11 @@ bool test_slotted_page()
         std::cerr << "SlottedPage test failed: " << e.what() << std::endl;
         return false;
     }
+    std::cout<<"Testing SlottedPage Done"<<std::endl;
 }
 
 bool test_heap_file() {
+    std::cout<<"\nTesting HeapFile...."<<std::endl;
     try {
         HeapFile heapFile("_test_heap_file");
         heapFile.create();
@@ -666,4 +672,9 @@ bool test_heap_file() {
         std::cerr << "Test failed with exception: " << e.what() << std::endl;
         return false;
     }
+    std::cout<<"Testing HeapFile Done"<<std::endl;
+}
+
+bool test_heap_storage() {
+    return  test_slotted_page() && test_heap_file() && test_heap_table();
 }

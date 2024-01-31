@@ -60,13 +60,7 @@ int main(int argc, char *argv[])
 
         if (userInput == "test")
         {
-            cout << "test_heap_storage: " << (test_heap_storage() ? "ok" : "failed") << endl;
-            continue;
-        } else if (userInput == "slotted") {
-            cout << "test_slotted_page: " << (test_slotted_page() ? "ok" : "failed") << endl;
-            continue;
-        } else if (userInput == "heapfile") {
-            cout << "test_heap_file: " << (test_heap_file() ? "ok" : "failed") << endl;
+            cout << "test_heap_storage:\n" << (test_heap_storage() ? "ok" : "failed") << endl;
             continue;
         }
 
